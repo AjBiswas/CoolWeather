@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": "electron",
+    "types": ["node"],
+    "outDir": "dist/electron"
+  },
+  "include": ["electron/**/*.ts"]
+}

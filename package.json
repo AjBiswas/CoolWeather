@@ -1,0 +1,54 @@
+{
+  "name": "coolweather",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive 3D desktop weather app for Windows.",
+  "main": "electron/main.js",
+  "author": "OpenAI Codex",
+  "scripts": {
+    "dev": "npm.cmd run dev:main-watch",
+    "dev:main-watch": "node_modules\\.bin\\tsc.cmd -p tsconfig.node.json --watch",
+    "dev:renderer": "node_modules\\.bin\\vite.cmd",
+    "dev:desktop": "node_modules\\.bin\\wait-on.cmd dist/electron/main.js tcp:5173 && node_modules\\.bin\\electron.cmd .",
+    "build": "node_modules\\.bin\\tsc.cmd --noEmit -p tsconfig.json && node_modules\\.bin\\tsc.cmd -p tsconfig.node.json && node_modules\\.bin\\vite.cmd build",
+    "preview": "node_modules\\.bin\\vite.cmd preview",
+    "dist": "npm.cmd run build && node_modules\\.bin\\electron-builder.cmd"
+  },
+  "build": {
+    "appId": "com.coolweather.desktop",
+    "productName": "CoolWeather",
+    "files": [
+      "dist/renderer/**/*",
+      "dist/electron/**/*",
+      "package.json"
+    ],
+
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    }
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.177.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.2",
+    "@types/react": "^18.3.21",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "electron": "^36.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.19",
+    "wait-on": "^8.0.3"
+  }
+}
+
+
+
+
+
