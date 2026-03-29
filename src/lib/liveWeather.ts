@@ -7,6 +7,8 @@ interface GeocodingResponse {
     latitude: number;
     longitude: number;
     admin1?: string;
+    admin2?: string;
+    admin3?: string;
     timezone?: string;
   }>;
 }
@@ -18,6 +20,8 @@ interface ReverseGeocodingResponse {
     latitude: number;
     longitude: number;
     admin1?: string;
+    admin2?: string;
+    admin3?: string;
     timezone?: string;
   }>;
 }
@@ -41,6 +45,29 @@ interface ForecastResponse {
     wind_speed_10m: number[];
     uv_index: number[];
     is_day: number[];
+  };
+}
+
+interface ArchiveResponse {
+  timezone?: string;
+  daily?: {
+    time: string[];
+    weather_code: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    temperature_2m_mean: number[];
+    precipitation_sum: number[];
+  };
+}
+
+interface AstronomyResponse {
+  timezone?: string;
+  daily?: {
+    time: string[];
+    sunrise: string[];
+    sunset: string[];
+    moonrise: string[];
+    moonset: string[];
   };
 }
 
@@ -105,6 +132,8 @@ interface LocationMatch {
   latitude: number;
   longitude: number;
   admin1?: string;
+  admin2?: string;
+  admin3?: string;
   timezone?: string;
 }
 
@@ -266,6 +295,113 @@ function formatHourLabel(isoTime: string, isNow = false) {
     minute: "2-digit",
     hour12: true
   });
+}
+
+const RAD = Math.PI / 180;
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+function toJulian(date: Date) {
+  return date.getTime() / DAY_MS - 0.5 + 2440588;
+}
+
+function fromJulian(julian: number) {
+  return new Date((julian - 2440588 + 0.5) * DAY_MS);
+}
+
+function daysSince2000(date: Date) {
+  return (date.getTime() - Date.UTC(2000, 0, 1, 12, 0, 0)) / DAY_MS;
+}
+
+function normalizeAngle(angle: number) {
+  return angle - Math.floor(angle / (2 * Math.PI)) * 2 * Math.PI;
+}
+
+function moonCoords(d: number) {
+  const L = normalizeAngle((218.316 + 13.176396 * d) * RAD);
+  const M = normalizeAngle((134.963 + 13.064993 * d) * RAD);
+  const F = normalizeAngle((93.272 + 13.229350 * d) * RAD);
+
+  const l = L + (6.289 * RAD) * Math.sin(M);
+  const b = (5.128 * RAD) * Math.sin(F);
+  const dist = 385001 - 20905 * Math.cos(M);
+
+  return { l, b, dist };
+}
+
+function eclipticToEquatorial(l: number, b: number) {
+  const e = (23.439291 - 0.0130042 * (daysSince2000(new Date()) / 36525)) * RAD;
+
+  const sinE = Math.sin(e);
+  const cosE = Math.cos(e);
+
+  const sinL = Math.sin(l);
+  const cosL = Math.cos(l);
+  const sinB = Math.sin(b);
+  const cosB = Math.cos(b);
+
+  const x = cosL * cosB;
+  const y = sinL * cosB;
+  const z = sinB;
+
+  const xEq = x;
+  const yEq = y * cosE - z * sinE;
+  const zEq = y * sinE + z * cosE;
+
+  const ra = Math.atan2(yEq, xEq);
+  const dec = Math.atan2(zEq, Math.sqrt(xEq * xEq + yEq * yEq));
+
+  return { ra, dec };
+}
+
+function siderealTime(d: number, lw: number) {
+  return normalizeAngle((280.16 + 360.9856235 * d) * RAD) - lw;
+}
+
+function moonPosition(date: Date, lat: number, lng: number) {
+  const d = daysSince2000(date);
+  const coords = moonCoords(d);
+  const eq = eclipticToEquatorial(coords.l, coords.b);
+
+  const lw = -lng * RAD;
+  const phi = lat * RAD;
+  const H = siderealTime(d, lw) - eq.ra;
+
+  const altitude = Math.asin(
+    Math.sin(phi) * Math.sin(eq.dec) +
+      Math.cos(phi) * Math.cos(eq.dec) * Math.cos(H)
+  );
+
+  return { altitude, azimuth: Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(eq.dec) * Math.cos(phi)), distance: coords.dist };
+}
+
+function getMoonTimes(date: Date, lat: number, lng: number) {
+  const hc = 0.133 * RAD;
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
+
+  let rise: Date | undefined;
+  let set: Date | undefined;
+  let prev = moonPosition(start, lat, lng);
+  let prevAlt = prev.altitude - hc;
+
+  for (let hour = 1; hour <= 24; hour++) {
+    const instant = new Date(start.getTime() + hour * 3600000);
+    const current = moonPosition(instant, lat, lng);
+    const currentAlt = current.altitude - hc;
+
+    if (prevAlt <= 0 && currentAlt > 0) {
+      const t = hour - 1 + (0 - prevAlt) / (currentAlt - prevAlt);
+      rise = new Date(start.getTime() + t * 3600000);
+    }
+
+    if (prevAlt >= 0 && currentAlt < 0) {
+      const t = hour - 1 + (0 - prevAlt) / (currentAlt - prevAlt);
+      set = new Date(start.getTime() + t * 3600000);
+    }
+
+    prevAlt = currentAlt;
+  }
+
+  return { rise, set };
 }
 
 function coerceArray<T>(value: unknown): T[] {
@@ -524,6 +660,132 @@ function buildHourlySlices(
   return { forecast, hourlyDetails };
 }
 
+async function fetchHistoricalData(latitude: number, longitude: number, timezone?: string) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const startDate = new Date(yesterday);
+  startDate.setDate(startDate.getDate() - 9);
+  
+  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  
+  const archiveUrl = new URL("https://archive-api.open-meteo.com/v1/archive");
+  archiveUrl.searchParams.set("latitude", `${latitude}`);
+  archiveUrl.searchParams.set("longitude", `${longitude}`);
+  archiveUrl.searchParams.set("start_date", formatDate(startDate));
+  archiveUrl.searchParams.set("end_date", formatDate(yesterday));
+  archiveUrl.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum");
+  archiveUrl.searchParams.set("timezone", timezone ?? "auto");
+
+  try {
+    const archiveData = await desktopFetchJson<ArchiveResponse>(archiveUrl.toString());
+    const daily = archiveData.daily;
+
+    if (!daily || !daily.time) {
+      return undefined;
+    }
+
+    return daily.time.map((date, index) => ({
+      date,
+      temperatureMaxC: daily.temperature_2m_max[index] ?? 0,
+      temperatureMinC: daily.temperature_2m_min[index] ?? 0,
+      temperatureAvgC: daily.temperature_2m_mean[index] ?? 0,
+      condition: toCondition(daily.weather_code[index] ?? 0, true),
+      precipitationMm: daily.precipitation_sum[index] ?? 0
+    }));
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchAstronomyData(latitude: number, longitude: number, timezone?: string) {
+  const formatTime = (time: string | undefined, tz?: string) => {
+    if (!time) return undefined;
+    const date = new Date(time);
+    if (Number.isNaN(date.getTime())) {
+      return undefined;
+    }
+
+    const options: Intl.DateTimeFormatOptions = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    };
+
+    if (tz && tz !== "auto") {
+      options.timeZone = tz;
+    }
+
+    return date.toLocaleTimeString("en-US", options);
+  };
+
+  // Try sunrise/sunset first (supported on this backend/API version).
+  const safeAstronomyUrl = new URL("https://api.open-meteo.com/v1/forecast");
+  safeAstronomyUrl.searchParams.set("latitude", `${latitude}`);
+  safeAstronomyUrl.searchParams.set("longitude", `${longitude}`);
+  safeAstronomyUrl.searchParams.set("daily", "sunrise,sunset");
+  safeAstronomyUrl.searchParams.set("forecast_days", "1");
+  safeAstronomyUrl.searchParams.set("timezone", timezone ?? "auto");
+
+  let sunrise: string | undefined;
+  let sunset: string | undefined;
+
+  try {
+    const response = await desktopFetchJson<AstronomyResponse>(safeAstronomyUrl.toString());
+    const daily = response.daily;
+
+    if (daily && daily.time && daily.time.length > 0) {
+      sunrise = formatTime(daily.sunrise?.[0], timezone);
+      sunset = formatTime(daily.sunset?.[0], timezone);
+    }
+  } catch (error) {
+    console.warn("Astronomy sunrise/sunset fetch failed:", error);
+  }
+
+  // Moonrise/moonset are not consistently available in this version of Open-Meteo API.
+  // Try to request them separately in case they become available.
+  let moonrise: string | undefined;
+  let moonset: string | undefined;
+
+  try {
+    const moonUrl = new URL("https://api.open-meteo.com/v1/forecast");
+    moonUrl.searchParams.set("latitude", `${latitude}`);
+    moonUrl.searchParams.set("longitude", `${longitude}`);
+    moonUrl.searchParams.set("daily", "moonrise,moonset");
+    moonUrl.searchParams.set("forecast_days", "1");
+    moonUrl.searchParams.set("timezone", timezone ?? "auto");
+
+    const response = await desktopFetchJson<AstronomyResponse>(moonUrl.toString());
+    const daily = response.daily;
+
+    if (daily && daily.time && daily.time.length > 0) {
+      moonrise = formatTime(daily.moonrise?.[0], timezone);
+      moonset = formatTime(daily.moonset?.[0], timezone);
+    }
+  } catch {
+    // Ignore, keep as undefined.
+  }
+
+  // If moonrise/moonset are still missing, try local estimate.
+  if (!moonrise || !moonset) {
+    const estimate = getMoonTimes(new Date(), latitude, longitude);
+    if (!moonrise && estimate.rise) {
+      moonrise = formatTime(estimate.rise.toISOString(), timezone);
+    }
+    if (!moonset && estimate.set) {
+      moonset = formatTime(estimate.set.toISOString(), timezone);
+    }
+  }
+
+  return {
+    sunrise,
+    sunset,
+    moonrise,
+    moonset
+  };
+}
+
 async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapshot> {
   const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
   forecastUrl.searchParams.set("latitude", `${match.latitude}`);
@@ -548,9 +810,22 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
   const condition = toCondition(current.weather_code, current.is_day === 1);
   const { forecast, hourlyDetails } = buildHourlySlices(hourly, current.time);
 
+  // Fetch historical data (last 10 days)
+  const historicalData = await fetchHistoricalData(match.latitude, match.longitude, match.timezone);
+
+  // Fetch astronomy data
+  const astronomyData = await fetchAstronomyData(match.latitude, match.longitude, match.timezone);
+
+  // Build specific location string if admin2 or admin3 available
+  let specificLocation: string | undefined;
+  if (match.admin2) {
+    specificLocation = match.admin3 ? `${match.admin3}, ${match.admin2}` : match.admin2;
+  }
+
   const openMeteoSnapshot: WeatherSnapshot = {
     city: match.name,
     region: match.admin1 ? `${match.admin1}, ${match.country}` : match.country,
+    specificLocation,
     timezone: effectiveTimezone,
     temperatureC: current.temperature_2m,
     feelsLikeC: current.apparent_temperature,
@@ -561,8 +836,13 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     summary: describeCondition(condition),
     updatedAt: formatUpdatedAt(current.time, effectiveTimezone),
     source: "Open-Meteo",
+    sunrise: astronomyData.sunrise,
+    sunset: astronomyData.sunset,
+    moonrise: astronomyData.moonrise,
+    moonset: astronomyData.moonset,
     forecast,
     hourlyDetails,
+    historicalData,
     live: true
   };
 

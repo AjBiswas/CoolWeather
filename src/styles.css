@@ -163,18 +163,44 @@ body,
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(24px);
   -webkit-app-region: no-drag;
+  border-radius: 24px;
 }
 
 .detail-panel {
   width: min(100%, 520px);
   max-height: calc(100vh - 32px);
   overflow: auto;
+  overflow-y: overlay;
   border-radius: 24px;
   padding: 22px;
   color: #eef4ff;
   background: linear-gradient(155deg, rgba(0, 0, 0, 0.78), rgba(14, 14, 14, 0.68));
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  -webkit-mask-image: radial-gradient(circle, white 0%, white 100%);
+  -webkit-mask-composite: destination-in;
+}
+
+.detail-panel::-webkit-scrollbar {
+  width: 10px;
+  margin-right: 2px;
+}
+
+.detail-panel::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 24px 0;
+}
+
+.detail-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.detail-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+  background-clip: content-box;
 }
 
 
@@ -368,6 +394,121 @@ body,
 .forecast-meta {
   color: rgba(184, 208, 245, 0.88);
   font-size: 11px;
+}
+
+.detail-astronomy-zone {
+  margin: 20px 0;
+}
+
+.astronomy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.astronomy-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(30, 144, 255, 0.12);
+  border: 1px solid rgba(135, 206, 250, 0.25);
+  text-align: center;
+}
+
+.astronomy-label {
+  display: block;
+  font-size: 12px;
+  color: rgba(135, 206, 250, 0.9);
+  font-weight: 600;
+}
+
+.astronomy-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.detail-location-info {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(18, 27, 44, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.location-detail {
+  padding: 10px 0;
+}
+
+.location-text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(227, 236, 255, 0.92);
+  font-weight: 600;
+}
+
+.detail-historical-zone {
+  margin: 20px 0;
+}
+
+.historical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: 8px;
+}
+
+.historical-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: rgba(18, 27, 44, 0.47);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  font-size: 11px;
+}
+
+.historical-date {
+  font-weight: 700;
+  color: rgba(227, 236, 255, 0.78);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.historical-temps {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+
+.temp-max {
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.temp-min {
+  font-size: 12px;
+  color: rgba(184, 208, 245, 0.78);
+}
+
+.historical-condition {
+  color: rgba(227, 236, 255, 0.85);
+  font-size: 10px;
+  display: block;
+}
+
+.historical-precip {
+  color: rgba(66, 191, 255, 0.87);
+  font-size: 9px;
+  display: block;
 }
 
 .detail-temp-block,

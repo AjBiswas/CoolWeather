@@ -23,9 +23,19 @@ export interface HourlyDetailPoint {
   uvIndex: number;
 }
 
+export interface HistoricalDataPoint {
+  date: string;
+  temperatureMaxC: number;
+  temperatureMinC: number;
+  temperatureAvgC: number;
+  condition: WeatherCondition;
+  precipitationMm: number;
+}
+
 export interface WeatherSnapshot {
   city: string;
   region: string;
+  specificLocation?: string;
   temperatureC: number;
   feelsLikeC: number;
   humidity: number;
@@ -37,6 +47,11 @@ export interface WeatherSnapshot {
   source?: string;
   live?: boolean;
   timezone?: string;
+  sunrise?: string;
+  sunset?: string;
+  moonrise?: string;
+  moonset?: string;
   forecast: ForecastPoint[];
   hourlyDetails: HourlyDetailPoint[];
+  historicalData?: HistoricalDataPoint[];
 }

@@ -440,6 +440,74 @@ export default function App() {
                 </div>
               </section>
 
+              {weather.specificLocation && (
+                <section className="detail-location-info">
+                  <div className="detail-section-head">
+                    <span>Specific Location</span>
+                  </div>
+                  <div className="location-detail">
+                    <p className="location-text">{weather.specificLocation}</p>
+                  </div>
+                </section>
+              )}
+
+              <section className="detail-astronomy-zone">
+                <div className="detail-section-head">
+                  <span>Astronomy</span>
+                </div>
+                <div className="astronomy-grid">
+                  <div className="astronomy-card">
+                    <span className="astronomy-label">🌅 Sunrise</span>
+                    <span className="astronomy-value">{weather.sunrise ?? "--"}</span>
+                  </div>
+                  <div className="astronomy-card">
+                    <span className="astronomy-label">🌇 Sunset</span>
+                    <span className="astronomy-value">{weather.sunset ?? "--"}</span>
+                  </div>
+                  <div className="astronomy-card">
+                    <span className="astronomy-label">🌙 Moonrise</span>
+                    <span className="astronomy-value">{weather.moonrise ?? "--"}</span>
+                  </div>
+                  <div className="astronomy-card">
+                    <span className="astronomy-label">🌙 Moonset</span>
+                    <span className="astronomy-value">{weather.moonset ?? "--"}</span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="detail-debug">
+                <p><strong>DEBUG astronomy raw:</strong></p>
+                <p>sunrise: {String(weather.sunrise)}</p>
+                <p>sunset: {String(weather.sunset)}</p>
+                <p>moonrise: {String(weather.moonrise)}</p>
+                <p>moonset: {String(weather.moonset)}</p>
+              </section>
+
+              {weather.historicalData && weather.historicalData.length > 0 && (
+                <section className="detail-historical-zone">
+                  <div className="detail-section-head">
+                    <span>Last 10 Days</span>
+                  </div>
+                  <div className="historical-grid">
+                    {weather.historicalData.map((item) => (
+                      <article key={item.date} className="historical-card">
+                        <span className="historical-date">
+                          {new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                        <div className="historical-temps">
+                          <span className="temp-max">{Math.round(item.temperatureMaxC)}°</span>
+                          <span className="temp-min">{Math.round(item.temperatureMinC)}°</span>
+                        </div>
+                        <span className="historical-condition">{displayConditionName(item.condition)}</span>
+                        {item.precipitationMm > 0 && (
+                          <span className="historical-precip">↓ {item.precipitationMm.toFixed(1)}mm</span>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section className="detail-search-dock">
                 <form className="search-glass" onSubmit={handleSearch}>
                   <input
