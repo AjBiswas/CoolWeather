@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Interactive 3D desktop weather app for Windows.",
   "main": "dist/electron/main.js",
-  "author": "OpenAI Codex",
+  "author": "Ajay Biswas",
   "scripts": {
     "dev": "npm.cmd run dev:main-watch",
     "dev:main-watch": "node_modules\\.bin\\tsc.cmd -p tsconfig.node.json --watch",
