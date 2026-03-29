@@ -190,13 +190,13 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
 
     const scene = new THREE.Scene();
 
-    new RGBELoader().load(
-      "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
-      (texture) => {
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-        scene.environment = texture;
-      }
-    );
+    // new RGBELoader().load(
+    //   "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
+    //   (texture) => {
+    //     texture.mapping = THREE.EquirectangularReflectionMapping;
+    //     scene.environment = texture;
+    //   }
+    // );
     const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 100);
     camera.position.set(0, 0, 10.8);
 
@@ -253,12 +253,12 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
 
     if (theme.showGlow) {
       const glowGeometry = new THREE.SphereGeometry(theme.orbScale * 1.3, 32, 32);
-      new THREE.MeshBasicMaterial({
-      color: "#000000",
-      transparent: true,
-      opacity: 0.06,
-      depthWrite: false   // 🔥 important (prevents heavy overlap look)
-    });
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: "#000000",
+        transparent: true,
+        opacity: 0.06,
+        depthWrite: false   // 🔥 important (prevents heavy overlap look)
+      });
       const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
       glowMesh.position.set(-1.52, 1.08, -0.55);
       scene.add(glowMesh);

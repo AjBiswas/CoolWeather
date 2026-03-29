@@ -266,14 +266,7 @@ export default function App() {
 
  const numberFrontStyle = {
   ...numberTextStyle,
-
-  // ❌ REMOVE BACKGROUND COMPLETELY
-  background: "none",
-
-  // ✅ Clean solid color
   color: usesDarkNumber ? "#1f2937" : "#ffffff",
-
-  // ✅ iOS-style soft lighting
   textShadow: usesDarkNumber
     ? `
       0 1px 0 rgba(255,255,255,0.25),
@@ -285,13 +278,10 @@ export default function App() {
       0 4px 10px rgba(0,0,0,0.12),
       0 10px 25px rgba(0,0,0,0.18)
     `,
-
-  // ✅ subtle glow (glass feel)
   filter: `
     drop-shadow(0 6px 18px rgba(0,0,0,0.15))
     drop-shadow(0 2px 6px rgba(255,255,255,0.08))
   `,
-
 } as CSSProperties;
 
   const labelStyle = {

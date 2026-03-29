@@ -1,10 +1,10 @@
 {
   "name": "coolweather",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Interactive 3D desktop weather app for Windows.",
-  "main": "electron/main.js",
+  "main": "dist/electron/main.js",
   "author": "OpenAI Codex",
   "scripts": {
     "dev": "npm.cmd run dev:main-watch",
@@ -19,13 +19,11 @@
     "appId": "com.coolweather.desktop",
     "productName": "CoolWeather",
     "files": [
-      "dist/renderer/**/*",
-      "dist/electron/**/*",
+      "dist",
       "package.json"
     ],
-
     "win": {
-      "target": "portable",
+      "target": "dir",
       "signAndEditExecutable": false
     }
   },
@@ -42,13 +40,9 @@
     "concurrently": "^9.1.2",
     "electron": "^36.2.0",
     "electron-builder": "^26.0.12",
+    "onchange": "^7.1.0",
     "typescript": "^5.8.3",
     "vite": "^5.4.19",
     "wait-on": "^8.0.3"
   }
 }
-
-
-
-
-

@@ -1,11 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 async function fetchRemote(url: string, kind: "json" | "text") {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "CoolWeather/0.1"
-    }
-  });
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Remote fetch failed: ${response.status}`);

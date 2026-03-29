@@ -1,80 +1,82 @@
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
-import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, screen } from "electron";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const isDev = !app.isPackaged;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SMALL_SIZE = { width: 420, height: 360 };
-const LARGE_SIZE = { width: 560, height: 420 };
 
-function getMainWindow() {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
-}
-
-function setWidgetSize(mode: "small" | "large" | "toggle") {
-  const window = getMainWindow();
-  if (!window) {
-    return;
-  }
-
-  const [currentWidth] = window.getSize();
-  const next =
-    mode === "small"
-      ? SMALL_SIZE
-      : mode === "large"
-        ? LARGE_SIZE
-        : currentWidth <= SMALL_SIZE.width + 20
-          ? LARGE_SIZE
-          : SMALL_SIZE;
-
-  window.setSize(next.width, next.height, true);
-}
+console.log("Main process script started.");
 
 function createWindow() {
-  const window = new BrowserWindow({
-    width: 400,
-    height: 300,
-    show: true,
+  console.log("Creating window...");
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const sessionToken = Math.random().toString(36).substring(2, 15);
+
+  const preloadPath = path.join(__dirname, "preload.js");
+  console.log(`Preload path: ${preloadPath}`);
+
+  const win = new BrowserWindow({
+    width: 560,
+    height: 420,
+    minWidth: 320,
+    minHeight: 280,
+    maxWidth: Math.round(width * 0.8),
+    maxHeight: Math.round(height * 0.8),
+    title: "CoolWeather",
     webPreferences: {
-      contextIsolation: true,
+      preload: preloadPath,
       nodeIntegration: false,
-      preload: path.join(__dirname, "preload.js")
-    }
+      contextIsolation: true,
+      sandbox: false
+    },
+    autoHideMenuBar: true,
+    frame: false,
+    transparent: true,
+    show: false,
+    hasShadow: false
+  });
+  console.log("Window created.");
+
+  win.setAspectRatio(560 / 420);
+
+  win.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+    details.requestHeaders["X-Session-Token"] = sessionToken;
+    callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
 
-  if (isDev) {
-    window.loadURL("http://localhost:5173");
+  console.log("Loading content...");
+  if (process.env.VITE_DEV_SERVER_URL) {
+    console.log(`Dev mode: loading from ${process.env.VITE_DEV_SERVER_URL}`);
+    win.loadURL(process.env.VITE_DEV_SERVER_URL);
+    win.webContents.openDevTools({ mode: "detach" });
   } else {
-    window.loadFile("index.html"); // 🔥 SAFE
+    const indexPath = path.join(__dirname, "../renderer/index.html");
+    console.log(`Production mode: loading from ${indexPath}`);
+    win.loadFile(indexPath);
   }
+  console.log("Content loaded.");
+
+  win.once("ready-to-show", () => {
+    console.log("Window ready to show.");
+    win.show();
+  });
 }
 
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === "geolocation";
-  });
-
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === "geolocation");
-  });
-
-  ipcMain.handle("widget:set-size", (_event, mode: "small" | "large" | "toggle") => {
-    setWidgetSize(mode);
-  });
-
+  console.log("App is ready.");
   createWindow();
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
 });
 
 app.on("window-all-closed", () => {
+  console.log("All windows closed.");
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
+app.on("activate", () => {
+  console.log("App activated.");
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

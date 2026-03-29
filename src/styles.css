@@ -95,7 +95,6 @@ body,
 
 .poster-number-back {
   color: var(--back);
-  filter: blur(0.35px);
 }
 
 .poster-number-side {
@@ -105,18 +104,6 @@ body,
 .poster-number-front {
   transform: scaleY(1.18);
   color: transparent;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.16) 20%, transparent 28%),
-    linear-gradient(180deg, var(--front-top) 0%, var(--front-mid) 52%, var(--front-low) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  text-shadow:
-    -1px -1px 0 var(--bevel-light),
-    1px 1px 0 rgba(255, 255, 255, 0.24),
-    2px 2px 0 rgba(0, 0, 0, 0.03),
-    0 8px 14px rgba(0, 0, 0, 0.07),
-    0 1px 0 rgba(255, 255, 255, 0.38),
-    0 -1px 0 var(--bevel-shadow);
 }
 
 .poster-number-wrap.is-placeholder {
