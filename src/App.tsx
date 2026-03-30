@@ -315,7 +315,7 @@ export default function App() {
     void loadWeather();
     const timer = window.setInterval(() => {
       void loadWeather();
-    }, 1000 * 60 * 10);
+    }, 1000 * 60 * 5);
 
     return () => {
       active = false;
@@ -441,7 +441,13 @@ export default function App() {
 
     try {
       const liveWeather = await fetchLiveWeather(query);
-      setWeather(liveWeather);
+      setWeather({
+        ...liveWeather,
+        updatedAt: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+      });
       setStatus(`${liveWeather.city}`);
       setManualQuery(query);
       setSearchValue("");
@@ -451,6 +457,7 @@ export default function App() {
       setIsSearching(false);
     }
   };
+
 
   const loadOpenMeteoService = async (serviceId: string) => {
     if (!weather.latitude || !weather.longitude) {
@@ -568,7 +575,12 @@ export default function App() {
                   </div>
                   <div className="orbit-metric orbit-metric-wide">
                     <span className="orbit-label">Updated</span>
-                    <strong>{weather.updatedAt}</strong>
+                    <strong>
+                    {new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </strong>
                     <em>{status}</em>
                   </div>
                 </div>
@@ -580,15 +592,30 @@ export default function App() {
                   <span>{displayConditionName(weather.condition, Boolean(weather.isNight))}</span>
                 </div>
                 <div className="detail-ribbon-scroll">
-                  {weather.hourlyDetails.map((item) => (
-                    <article key={item.label} className="forecast-pill">
-                      <span className="forecast-time">{item.label}</span>
-                      <strong className="forecast-temp">{formatTemp(item.temperatureC)}</strong>
-                      <span className="forecast-state">{displayConditionName(item.condition)}</span>
-                      <span className="forecast-meta">Wind {Math.round(item.windKph)} km/h</span>
-                      <span className="forecast-meta">UV {item.uvIndex.toFixed(1)}</span>
-                    </article>
-                  ))}
+                  {weather.hourlyDetails
+                    .filter(item => item.label?.toLowerCase().trim() !== "now")
+                    .map((item) => (
+                      <article key={item.label} className="forecast-pill">
+
+                        <span className="forecast-time">{item.label}</span>
+                        <span className="forecast-meta">Wind</span>
+
+                        <strong className="forecast-temp">
+                          {formatTemp(item.temperatureC)}
+                        </strong>
+                        <span className="forecast-meta">
+                          {Math.round(item.windKph)} km/h
+                        </span>
+
+                        <span className="forecast-state">
+                          {displayConditionName(item.condition)}
+                        </span>
+                        <span className="forecast-meta">
+                          UV {item.uvIndex.toFixed(1)}
+                        </span>
+
+                      </article>
+                    ))}
                 </div>
               </section>
 
