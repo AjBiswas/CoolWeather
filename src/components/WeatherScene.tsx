@@ -10,7 +10,7 @@ interface WeatherSceneProps {
   isNight?: boolean;
 }
 
-type ThemeKey = WeatherCondition | "partly-cloudy-night";
+type ThemeKey = WeatherCondition | "partly-cloudy-night" | "cloudy-night" | "rainy-night";
 
 interface SceneTheme {
   cloudColor: string;
@@ -47,8 +47,7 @@ const sceneThemes: Record<
     showGlow: true,        
     showRain: false,
     showLightning: false,
-    showStars: false,
-    cloudOpacity: 0.65,     
+    showStars: false,   
     cloudCount: 0,
     backgroundColor: "#8ac6ff",
     ambientIntensity: 0.42,   
@@ -69,8 +68,7 @@ const sceneThemes: Record<
     showGlow: true,        
     showRain: false,
     showLightning: false,
-    showStars: false,
-    cloudOpacity: 0.65,     
+    showStars: false,   
     cloudCount: 2,
     backgroundColor: "#8ac6ff",
     ambientIntensity: 0.42,   
@@ -91,8 +89,7 @@ const sceneThemes: Record<
     showGlow: true,        
     showRain: false,
     showLightning: false,
-    showStars: false,
-    cloudOpacity: 0.65,     
+    showStars: false,    
     cloudCount: 4,
     backgroundColor: "#8ac6ff",
     ambientIntensity: 0.42,   
@@ -113,8 +110,7 @@ const sceneThemes: Record<
     showGlow: true,        
     showRain: false,
     showLightning: false,
-    showStars: true,
-    cloudOpacity: 0.65,     
+    showStars: true,   
     cloudCount: 4,
     backgroundColor: "#0e1632",
     ambientIntensity: 0.42,   
@@ -202,6 +198,34 @@ const sceneThemes: Record<
 
     emissiveIntensity: 0.4
   },
+  "rainy-night": {
+    cloudColor: "#2f3e5e",
+    rainColor: "#6fbfff",
+
+    orbColor: "#dfe6ff",   // moon
+    orbOpacity: 0.5,
+    orbScale: 0.6,
+    showGlow: false,
+
+    showRain: true,        // ✅ important
+    showLightning: false,
+    showStars: false,
+
+    cloudOpacity: 0.95,
+    cloudCount: 9,
+
+    backgroundColor: "#0b1b3a",
+
+    ambientIntensity: 0.35,
+    keyColor: "#cfe3ff",
+    keyIntensity: 0.6,
+    fillColor: "#3a5680",
+    fillIntensity: 0.2,
+    bounceIntensity: 0.1,
+
+    emissiveIntensity: 0.3
+  },
+
   storm: {
     cloudColor: "#0f141f",     // darker clouds (almost black)
     rainColor: "#5fb3ff",      // brighter rain streaks
@@ -369,12 +393,16 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       if (condition === "partly-cloudy") {
         themeKey = "partly-cloudy-night";
       } else if (condition === "cloudy") {
-        themeKey = "cloudy-night";   // 🔥 NEW
+        themeKey = "cloudy-night";
+      } else if (condition === "rain") {
+        themeKey = "rainy-night";
+      } else if (condition === "storm") {
+        themeKey = "storm";
       } else {
         themeKey = "night";
       }
     } else {
-      themeKey = condition;
+      themeKey = condition;   // ✅ THIS WAS MISSING
     }
 
     const theme = sceneThemes[themeKey];

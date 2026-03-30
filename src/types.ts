@@ -59,6 +59,15 @@ export interface HistoricalDataPoint {
   precipitationMm: number;
 }
 
+export interface LocationSuggestion {
+  name: string;
+  country: string;
+  region?: string;
+  admin1?: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface WeatherSnapshot {
   city: string;
   region: string;

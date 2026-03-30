@@ -1,4 +1,4 @@
-import type { WeatherCondition, WeatherSnapshot } from "../types";
+import type { WeatherCondition, WeatherSnapshot, LocationSuggestion } from "../types";
 
 interface GeocodingResponse {
   results?: Array<{
@@ -1122,6 +1122,32 @@ export async function fetchLiveWeather(query: string): Promise<WeatherSnapshot> 
 export async function fetchLiveWeatherByCoords(latitude: number, longitude: number): Promise<WeatherSnapshot> {
   const match = await resolveLocationByCoords(latitude, longitude);
   return buildWeatherSnapshot(match);
+}
+
+export async function fetchLocationSuggestions(query: string): Promise<LocationSuggestion[]> {
+  if (query.trim().length < 2) {
+    return [];
+  }
+
+  const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  geocodeUrl.searchParams.set("name", query.trim());
+  geocodeUrl.searchParams.set("count", "10");
+  geocodeUrl.searchParams.set("language", "en");
+  geocodeUrl.searchParams.set("format", "json");
+
+  const geocodeData = await desktopFetchJson<GeocodingResponse>(geocodeUrl.toString());
+  const results = geocodeData.results || [];
+
+  return results
+    .slice(0, 5)
+    .map((r): LocationSuggestion => ({
+      name: r.name,
+      country: r.country,
+      region: r.admin1,
+      admin1: r.admin1,
+      latitude: r.latitude,
+      longitude: r.longitude
+    }));
 }
 
 export async function fetchLiveWeatherByIp(): Promise<WeatherSnapshot> {

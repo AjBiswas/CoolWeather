@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type FormEvent } from "react";
 import { WeatherScene } from "./components/WeatherScene";
 import { fallbackWeather } from "./data/mockWeather";
 import {
   fetchLiveWeather,
   fetchLiveWeatherByCoords,
   fetchLiveWeatherByIp,
+  fetchLocationSuggestions,
   fetchOpenMeteoService
 } from "./lib/liveWeather";
-import type { WeatherSnapshot } from "./types";
+import type { WeatherSnapshot, LocationSuggestion } from "./types";
 
 const BASE_WIDGET_WIDTH = 560;
 const BASE_WIDGET_HEIGHT = 420;
@@ -214,6 +215,8 @@ export default function App() {
   const [openMeteoServiceData, setOpenMeteoServiceData] = useState<unknown>(null);
   const [openMeteoServiceError, setOpenMeteoServiceError] = useState<string | null>(null);
   const [openMeteoServiceLoading, setOpenMeteoServiceLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const OPEN_METEO_SERVICES = [
     { id: "seasonal-forecast", label: "Seasonal Forecast" },
@@ -438,6 +441,7 @@ export default function App() {
 
     setIsSearching(true);
     setPanelMessage(null);
+    setShowSuggestions(false);
 
     try {
       const liveWeather = await fetchLiveWeather(query);
@@ -451,6 +455,7 @@ export default function App() {
       setStatus(`${liveWeather.city}`);
       setManualQuery(query);
       setSearchValue("");
+      setSuggestions([]);
     } catch {
       setPanelMessage("Could not find that location.");
     } finally {
@@ -480,9 +485,69 @@ export default function App() {
     }
   };
 
+const debounce = (fn: Function, delay: number) => {
+    let timer: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  };
+
+  const debouncedFetchSuggestions = useCallback(debounce(async (value: string) => {
+    if (value.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    try {
+      const results = await fetchLocationSuggestions(value);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    } catch {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, 300), []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchValue(value);
+    setPanelMessage(null);
+    debouncedFetchSuggestions(value);
+  };
+
+  const handleSelectSuggestion = async (suggestion: LocationSuggestion) => {
+    const query = `${suggestion.name}, ${suggestion.country}`;
+    setSearchValue(query);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setIsSearching(true);
+    try {
+      const liveWeather = await fetchLiveWeather(query);
+      setWeather({
+        ...liveWeather,
+        updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      });
+      setStatus(liveWeather.city);
+      setManualQuery(query);
+      setPanelMessage(null);
+    } catch (error) {
+      console.error("Suggestion fetch error:", error);
+      setPanelMessage("Could not fetch weather for selected location.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setTimeout(() => setShowSuggestions(false), 200);
+  };
+
   const handleUseCurrentLocation = () => {
     setManualQuery(null);
     setPanelMessage(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
   return (
@@ -527,7 +592,7 @@ export default function App() {
             <section className="detail-panel" onClick={(event) => event.stopPropagation()}>
               <header className="detail-topbar">
                 <div>
-                  <p className="detail-kicker">Live Atmosphere</p>
+                  <p className="detail-kicker">Live Weather Forcast</p>
                   <h2 className="detail-place">{weather.city}</h2>
                   <p className="detail-region">
                     {weather.region || weather.summary}
@@ -715,13 +780,30 @@ export default function App() {
                   <input
                     className="search-glass-input"
                     type="text"
-                    placeholder="Search a new city"
+                    placeholder="Search a new city or type location..."
                     value={searchValue}
-                    onChange={(event) => setSearchValue(event.target.value)}
+                    onChange={handleInputChange}
+                    onBlur={handleInputBlur}
+                    autoComplete="off"
                   />
                   <button className="search-glass-button" type="submit" disabled={isSearching}>
                     {isSearching ? "Finding" : "Search"}
                   </button>
+                  {showSuggestions && (
+                    <ul className="suggestions-dropdown" role="listbox">
+                      {suggestions.map((suggestion, index) => (
+                        <li
+                          key={`${suggestion.latitude}-${suggestion.longitude}`}
+                          className="suggestion-item"
+                          onMouseDown={() => handleSelectSuggestion(suggestion)}
+                          role="option"
+                          aria-selected={false}
+                        >
+                          {suggestion.name}, {suggestion.region || suggestion.country}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </form>
                 <button type="button" className="search-current" onClick={handleUseCurrentLocation}>
                   Current location
