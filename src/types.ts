@@ -9,6 +9,33 @@ export type WeatherCondition =
   | "snow"
   | "sunset";
 
+export interface WeatherSnapshot {
+  city: string;
+  region: string;
+  specificLocation?: string;
+  latitude?: number;
+  longitude?: number;
+  temperatureC: number;
+  feelsLikeC: number;
+  humidity: number;
+  windKph: number;
+  uvIndex: number;
+  condition: WeatherCondition;
+  summary: string;
+  updatedAt: string;
+  source?: string;
+  live?: boolean;
+  timezone?: string;
+  sunrise?: string;
+  sunset?: string;
+  moonrise?: string;
+  moonset?: string;
+  isNight?: boolean;
+  forecast: ForecastPoint[];
+  hourlyDetails: HourlyDetailPoint[];
+  historicalData?: HistoricalDataPoint[];
+}
+
 export interface ForecastPoint {
   label: string;
   temperatureC: number;
@@ -36,6 +63,8 @@ export interface WeatherSnapshot {
   city: string;
   region: string;
   specificLocation?: string;
+  latitude?: number;
+  longitude?: number;
   temperatureC: number;
   feelsLikeC: number;
   humidity: number;

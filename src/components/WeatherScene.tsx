@@ -7,131 +7,316 @@ import type { WeatherCondition } from "../types";
 interface WeatherSceneProps {
   condition: WeatherCondition;
   temperature: number;
+  isNight?: boolean;
+}
+
+type ThemeKey = WeatherCondition | "partly-cloudy-night";
+
+interface SceneTheme {
+  cloudColor: string;
+  rainColor: string;
+  orbColor: string;
+  showRain: boolean;
+  showLightning: boolean;
+  showStars: boolean;
+  orbOpacity: number;
+  cloudOpacity: number;
+  orbScale: number;
+  showGlow: boolean;
+  backgroundColor: string;
+  ambientIntensity: number;
+  keyColor: string;
+  keyIntensity: number;
+  fillColor: string;
+  fillIntensity: number;
+  bounceIntensity: number;
+  cloudCount: number;
 }
 
 const sceneThemes: Record<
-  WeatherCondition,
-  {
-    cloudColor: string;
-    rainColor: string;
-    orbColor: string;
-    showRain: boolean;
-    showLightning: boolean;
-    showStars: boolean;
-    orbOpacity: number;
-    cloudOpacity: number;
-    orbScale: number;
-    showGlow: boolean;
-  }
+  ThemeKey,
+  SceneTheme
 > = {
   clear: {
-    cloudColor: "#f3f6fb",
-    rainColor: "#42bfff",
-    orbColor: "#ffeb3b",
+     cloudColor: "#eaeef5",
+    rainColor: "#8abfff",
+    orbColor: "#f2b844",
+    orbOpacity: 1.0, 
+    cloudOpacity: 0.88,    
+    orbScale: 0.9,         
+    showGlow: true,        
     showRain: false,
     showLightning: false,
     showStars: false,
-    orbOpacity: 1,
-    cloudOpacity: 0.95,
-    orbScale: 0.5,
-    showGlow: true
+    cloudOpacity: 0.65,     
+    cloudCount: 0,
+    backgroundColor: "#8ac6ff",
+    ambientIntensity: 0.42,   
+    keyColor: "#fff0bc",
+    keyIntensity: 1.0,        
+    fillColor: "#cfeaff",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+    emissiveIntensity: 2.2
   },
   "mostly-sunny": {
-    cloudColor: "#f7f7f2",
-    rainColor: "#42bfff",
-    orbColor: "#ffd84a",
+    cloudColor: "#eaeef5",
+    rainColor: "#8abfff",
+    orbColor: "#f2b844",
+    orbOpacity: 1.0, 
+    cloudOpacity: 0.88,    
+    orbScale: 0.9,         
+    showGlow: true,        
     showRain: false,
     showLightning: false,
     showStars: false,
-    orbOpacity: 1,
-    cloudOpacity: 0.65,
-    orbScale: 0.45,
-    showGlow: true
+    cloudOpacity: 0.65,     
+    cloudCount: 2,
+    backgroundColor: "#8ac6ff",
+    ambientIntensity: 0.42,   
+    keyColor: "#fff0bc",
+    keyIntensity: 1.0,        
+    fillColor: "#cfeaff",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+    emissiveIntensity: 2.2
   },
   "partly-cloudy": {
-    cloudColor: "#f1f4f8",
-    rainColor: "#42bfff",
-    orbColor: "#f7f3e5",
+    cloudColor: "#eaeef5",
+    rainColor: "#8abfff",
+    orbColor: "#f2b844",
+    orbOpacity: 1.0, 
+    cloudOpacity: 0.88,    
+    orbScale: 0.9,         
+    showGlow: true,        
     showRain: false,
     showLightning: false,
     showStars: false,
-    orbOpacity: 0.78,
-    cloudOpacity: 0.8,
-    orbScale: 0.35,
-    showGlow: false
+    cloudOpacity: 0.65,     
+    cloudCount: 4,
+    backgroundColor: "#8ac6ff",
+    ambientIntensity: 0.42,   
+    keyColor: "#fff0bc",
+    keyIntensity: 1.0,        
+    fillColor: "#cfeaff",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+    emissiveIntensity: 2.2
+  },
+    "partly-cloudy-night": {
+    cloudColor: "#1f2b45",
+    rainColor: "#8abfff",
+    orbColor: "#f5f7ff" ,
+    orbOpacity: 1.0, 
+    cloudOpacity: 0.88,    
+    orbScale: 0.9,         
+    showGlow: true,        
+    showRain: false,
+    showLightning: false,
+    showStars: true,
+    cloudOpacity: 0.65,     
+    cloudCount: 4,
+    backgroundColor: "#0e1632",
+    ambientIntensity: 0.42,   
+    keyColor: "#dfe8ff",
+    keyIntensity: 1.0,        
+    fillColor: "#4a5c88",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+    emissiveIntensity: 2.2
   },
   haze: {
-    cloudColor: "#d8d8d8",
+    cloudColor: "#b8bec3",     
     rainColor: "#93b6c9",
     orbColor: "#f8e69f",
+    orbOpacity: 0.7,           // less visible
+    orbScale: 0.38,            // medium size
+    showGlow: false,           // ❌ no glow in haze
     showRain: false,
     showLightning: false,
     showStars: false,
-    orbOpacity: 0.88,
-    cloudOpacity: 0.82,
-    orbScale: 0.4,
-    showGlow: false
+    cloudOpacity: 0.8,
+    cloudCount: 6,
+    backgroundColor: "#9ea5ae",
+    ambientIntensity: 0.5,
+    keyColor: "#f7f3d1",
+    keyIntensity: 0.85,
+    fillColor: "#c6cbd4",
+    fillIntensity: 0.3,
+    bounceIntensity: 0.15,
+    emissiveIntensity: 1.0     
   },
   cloudy: {
-    cloudColor: "#f3f6fb",
+    cloudColor: "#c7d2e4",     // slightly bright grey-blue clouds
     rainColor: "#42bfff",
+    // ☀️ Sun almost hidden
     orbColor: "#d4dae5",
+    orbOpacity: 0.35,          // barely visible
+    orbScale: 0.28,            // small
+    showGlow: false,           // ❌ no glow
     showRain: false,
     showLightning: false,
     showStars: false,
-    orbOpacity: 0.75,
-    cloudOpacity: 0.98,
-    orbScale: 0.24,
-    showGlow: false
+    // ☁️ Clouds heavy & dense
+    cloudOpacity: 0.95,
+    cloudCount: 8,
+    // 🌥️ Background darker than haze
+    backgroundColor: "#7e97ba",
+    // 💡 Lighting (soft but slightly darker)
+    ambientIntensity: 0.45,
+    keyColor: "#f0f4f9",
+    keyIntensity: 0.9,
+    fillColor: "#cddedf",
+    fillIntensity: 0.32,
+    bounceIntensity: 0.2,
+    emissiveIntensity: 0.6      // very low (sun hidden)
   },
   rain: {
-    cloudColor: "#f3f6fb",
-    rainColor: "#42bfff",
-    orbColor: "#d4dae5",
+    cloudColor: "#8f9db5",     // darker clouds
+    rainColor: "#4fa8ff",      // slightly brighter rain (visible)
+
+    // 🌙 Sun almost invisible
+    orbColor: "#cfd6e2",
+    orbOpacity: 0.25,          // more hidden
+    orbScale: 0.22,
+    showGlow: false,
+
     showRain: true,
     showLightning: false,
     showStars: false,
-    orbOpacity: 0.5,
-    cloudOpacity: 0.96,
-    orbScale: 0.24,
-    showGlow: false
+
+    // ☁️ Heavy clouds
+    cloudOpacity: 1.0,
+    cloudCount: 9,
+
+    // 🌧️ Dark rainy sky
+    backgroundColor: "#4f6b8a",
+
+    // 💡 Lighting (darker + moody)
+    ambientIntensity: 0.38,
+    keyColor: "#cfe3f7",
+    keyIntensity: 0.75,
+    fillColor: "#9fb7d1",
+    fillIntensity: 0.2,
+    bounceIntensity: 0.12,
+
+    emissiveIntensity: 0.4
   },
   storm: {
-    cloudColor: "#191c22",
-    rainColor: "#42bfff",
-    orbColor: "#d4dae5",
+    cloudColor: "#0f141f",     // darker clouds (almost black)
+    rainColor: "#5fb3ff",      // brighter rain streaks
+
+    // 🌙 Sun almost gone
+    orbColor: "#c9d2e3",
+    orbOpacity: 0.15,          // barely visible
+    orbScale: 0.22,
+    showGlow: false,
+
     showRain: true,
     showLightning: true,
     showStars: false,
-    orbOpacity: 0.4,
+
+    // ☁️ Heavy storm clouds
     cloudOpacity: 1,
-    orbScale: 0.24,
-    showGlow: false
+    cloudCount: 10,
+
+    // 🌩️ Deep storm sky
+    backgroundColor: "#0a1224",
+
+    // 💡 Lighting (dramatic)
+    ambientIntensity: 0.32,
+    keyColor: "#cfe8ff",
+    keyIntensity: 0.7,
+    fillColor: "#4a628a",
+    fillIntensity: 0.12,
+    bounceIntensity: 0.1,
+
+    emissiveIntensity: 0.3
   },
   snow: {
-    cloudColor: "#f5f8fd",
-    rainColor: "#d7ebff",
-    orbColor: "#f7fbff",
+    cloudColor: "#edf0f7",
+    rainColor: "#ffffff",      // ❄️ pure white snow
     showRain: true,
-    showLightning: false,
-    showStars: false,
-    orbOpacity: 0.6,
-    cloudOpacity: 0.97,
-    orbScale: 0.24,
-    showGlow: false
+
+    orbColor: "#f7fbff",
+    orbOpacity: 0.5,           // softer sun
+    orbScale: 0.22,
+    showGlow: false,
+
+    cloudOpacity: 0.98,
+    cloudCount: 8,
+
+    backgroundColor: "#eaf4ff",
+
+    ambientIntensity: 0.6,     // brighter snow feel
+    keyColor: "#ffffff",
+    keyIntensity: 1.0,
+    fillColor: "#dfefff",
+    fillIntensity: 0.4,
+    bounceIntensity: 0.25
   },
   sunset: {
     cloudColor: "#f7e7dc",
-    rainColor: "#42bfff",
     orbColor: "#ff9f54",
-    showRain: false,
-    showLightning: false,
-    showStars: false,
     orbOpacity: 1,
-    cloudOpacity: 0.92,
-    orbScale: 0.42,
-    showGlow: true
-  }
+    orbScale: 0.8,        // ☀️ slightly bigger sun
+    showGlow: true,
+
+    backgroundColor: "#ff6a3d", // slightly deeper
+
+    ambientIntensity: 0.5,
+    keyColor: "#ffd6a3",
+    keyIntensity: 1.4,
+    fillColor: "#f4bb86",
+    fillIntensity: 0.45,
+    bounceIntensity: 0.3
+  },
+ night: {
+    cloudColor: "#2f3e5e",     // slightly darker
+    orbColor: "#f0f4ff",
+
+    orbOpacity: 0.8,           // 🌙 more visible moon
+    orbScale: 0.9,            // bigger moon
+    showGlow: true,            // subtle glow add karo
+
+    backgroundColor: "#081a3a", // deeper night
+
+    ambientIntensity: 0.4,
+    keyColor: "#d9e7ff",
+    keyIntensity: 1.1,
+    fillColor: "#3a5680",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+
+    cloudOpacity: 0.75,
+    cloudCount: 5,
+    showStars: true
+  },
+  "cloudy-night": {
+  cloudColor: "#2f3e5e",
+  rainColor: "#8dc4ff",
+
+  orbColor: "#dcdee5",
+  orbOpacity: 0.7,
+  orbScale: 0.6,
+  showGlow: false,
+
+  showRain: false,
+  showLightning: false,
+  showStars: false,
+
+  cloudOpacity: 0.9,
+  cloudCount: 9,
+
+  backgroundColor: "#081a3a",
+
+  ambientIntensity: 0.4,
+  keyColor: "#d9e7ff",
+  keyIntensity: 0.9,
+  fillColor: "#3a5680",
+  fillIntensity: 0.28,
+  bounceIntensity: 0.18
+}
 };
 
 function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z: number, scale: number, opacity: number) {
@@ -169,7 +354,7 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
 
   group.add(puff);
 }
-export function WeatherScene({ condition }: WeatherSceneProps) {
+export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -178,7 +363,21 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
       return;
     }
 
-    const theme = sceneThemes[condition];
+    let themeKey: ThemeKey;
+
+    if (isNight) {
+      if (condition === "partly-cloudy") {
+        themeKey = "partly-cloudy-night";
+      } else if (condition === "cloudy") {
+        themeKey = "cloudy-night";   // 🔥 NEW
+      } else {
+        themeKey = "night";
+      }
+    } else {
+      themeKey = condition;
+    }
+
+    const theme = sceneThemes[themeKey];
     const width = mount.clientWidth;
     const height = mount.clientHeight;
 
@@ -189,6 +388,7 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    scene.background = null; // keep renderer transparent, no solid background
 
     // new RGBELoader().load(
     //   "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
@@ -201,35 +401,64 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
     camera.position.set(0, 0, 10.8);
 
     // 🔥 Ambient light
-    scene.add(new THREE.AmbientLight("#ffffff", 0.6));
+    scene.add(new THREE.AmbientLight("#ffffff", theme.ambientIntensity));
 
-    // 🔥 Main sunlight
-    const key = new THREE.DirectionalLight("#fff5cc", 1.4);
+    // 🔥 Main sunlight/moonlight
+    const key = new THREE.DirectionalLight(theme.keyColor, theme.keyIntensity);
     key.position.set(-3, 4, 5);
     scene.add(key);
 
     // 🔥 Fill light
-    const fill = new THREE.DirectionalLight("#cfe8ff", 0.6);
+    const fill = new THREE.DirectionalLight(theme.fillColor, theme.fillIntensity);
     fill.position.set(3, 2, 4);
     scene.add(fill);
 
     // 🔥 Bottom bounce
-    const bounce = new THREE.DirectionalLight("#ffffff", 0.3);
+    const bounce = new THREE.DirectionalLight("#ffffff", theme.bounceIntensity);
     bounce.position.set(0, -3, 2);
     scene.add(bounce);
 
     const cloud = new THREE.Group();
-    addCloudPuff(cloud, theme.cloudColor, -1.4, 0.95, 0.1, 0.9, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, -0.7, 1.18, 0.15, 1.02, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, 0.06, 1.24, 0.2, 1.22, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, 0.92, 1.1, 0.18, 1.04, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, 1.6, 0.9, 0.1, 0.86, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, -0.16, 0.65, -0.08, 1.36, theme.cloudOpacity);
-    addCloudPuff(cloud, theme.cloudColor, 0.86, 0.65, -0.05, 1, theme.cloudOpacity);
+    const baseCloudPositions = [
+      [-1.4, 0.95, 0.1, 0.9],
+      [-0.7, 1.18, 0.15, 1.02],
+      [0.06, 1.24, 0.2, 1.22],
+      [0.92, 1.1, 0.18, 1.04],
+      [1.6, 0.9, 0.1, 0.86],
+      [-0.16, 0.65, -0.08, 1.36],
+      [0.86, 0.65, -0.05, 1]
+    ];
+
+    for (let i = 0; i < theme.cloudCount; i += 1) {
+    const index = i % baseCloudPositions.length;
+    let [x, y, z, scale] = baseCloudPositions[index];
+
+    const jitterX = x + (Math.random() - 0.5) * 0.18;
+    const jitterY = y - 0.2 + (Math.random() - 0.5) * 0.12;
+    const jitterScale = scale * (0.85 + Math.random() * 0.2);
+
+    // 🔥 MAGIC: half clouds back, half front
+    const isFront = i % 2 === 0;
+
+    // 🔥 shift front clouds sideways (moon cover na kare)
+    const offsetX = isFront ? (Math.random() > 0.5 ? 0.6 : -0.6) : 0;
+
+    const finalZ = isFront ? 0.3 : -0.4;
+
+    addCloudPuff(
+      cloud,
+      theme.cloudColor,
+      jitterX + offsetX,
+      jitterY,
+      finalZ,
+      jitterScale,
+      theme.cloudOpacity
+    );
+  }
 
     const underShadow = new THREE.Mesh(
       new THREE.SphereGeometry(1.6, 32, 32),
-      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.08 * theme.cloudOpacity })
+      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.22 * theme.cloudOpacity })
     );
     underShadow.position.set(0.2, 0.15, -0.6);
     underShadow.scale.set(1.4, 0.25, 0.9);
@@ -241,37 +470,40 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color(theme.orbColor),
       emissive: new THREE.Color(theme.orbColor),
-      emissiveIntensity: 1.4,   // 🔥 glow
+      emissiveIntensity: theme.emissiveIntensity || 1.4,   // 🔥 glow
       roughness: 0.4,
       metalness: 0,
       transparent: true,
       opacity: theme.orbOpacity
     })
     );
-      orb.position.set(-1.52, 1.08, -0.55);
+      orb.position.set(0, 1.35, -0.2);
     scene.add(orb);
 
     if (theme.showGlow) {
       const glowGeometry = new THREE.SphereGeometry(theme.orbScale * 1.3, 32, 32);
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: "#000000",
-        transparent: true,
-        opacity: 0.06,
-        depthWrite: false   // 🔥 important (prevents heavy overlap look)
+      color: theme.orbColor,   // ✅ same as sun/moon
+      transparent: true,
+      opacity: 0.15,           // thoda increase for nice glow
+      depthWrite: false
       });
       const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-      glowMesh.position.set(-1.52, 1.08, -0.55);
+      glowMesh.position.set(0, 1.35, -0.2);
       scene.add(glowMesh);
     }
 
     const starGroup = new THREE.Group();
     if (theme.showStars) {
-      for (let index = 0; index < 6; index += 1) {
+      for (let index = 0; index < 7; index += 1) {
         const star = new THREE.Mesh(
-          new THREE.SphereGeometry(0.05 + Math.random() * 0.02, 12, 12),
-          new THREE.MeshBasicMaterial({ color: "#181a1f" })
+          new THREE.SphereGeometry(0.04 + Math.random() * 0.018, 12, 12),
+          new THREE.MeshBasicMaterial({ color: theme.orbColor === "#f7f9ff" ? "#ffe" : "#ffd76a" })
         );
-        star.position.set(-2 + Math.random() * 4, 2.7 + Math.random() * 0.8, -0.3);
+        const spreadX = -2 + Math.random() * 4;
+        const spreadY = 1.2 + Math.random() * 1.4; // bigger vertical spread
+
+        star.position.set(spreadX, spreadY, -0.3);
         starGroup.add(star);
       }
     }
@@ -305,9 +537,15 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
 
     const clock = new THREE.Clock();
     let frameId = 0;
+    let lightningTimer = 0;
+    let isFlashing = false;
+
+    const flashColor = new THREE.Color("#1a2a4f");
 
     const animate = () => {
+      const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
+
       cloud.position.y = Math.sin(elapsed * 0.85) * 0.015;
       orb.position.y = 1.08 + Math.sin(elapsed * 1.4) * 0.025;
 
@@ -319,14 +557,31 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
       });
 
       if (theme.showLightning) {
-        const flash = Math.max(0, Math.sin(elapsed * 5.2)) ** 18;
-        lightningMat.opacity = flash;
+        lightningTimer -= delta;
+
+        if (lightningTimer <= 0) {
+          if (Math.random() > 0.96) {
+            isFlashing = true;
+            lightningTimer = 0.12;
+          } else {
+            isFlashing = false;
+            lightningTimer = 1 + Math.random() * 2;
+          }
+        }
+
+        // 🔥 smooth lightning fade
+        if (isFlashing) {
+          lightningMat.opacity = Math.min(1, lightningMat.opacity + 0.25);
+          scene.background = flashColor;
+        } else {
+          lightningMat.opacity *= 0.85;
+          scene.background = null;
+        }
       }
 
       renderer.render(scene, camera);
       frameId = window.requestAnimationFrame(animate);
     };
-
     animate();
 
     const onResize = () => {
@@ -355,7 +610,7 @@ export function WeatherScene({ condition }: WeatherSceneProps) {
       });
       mount.removeChild(renderer.domElement);
     };
-  }, [condition]);
+  }, [condition, isNight]);
 
   return <div className="weather-scene" ref={mountRef} aria-hidden="true" />;
 }

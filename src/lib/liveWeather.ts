@@ -176,7 +176,7 @@ function toNumber(value: unknown) {
   return undefined;
 }
 
-function toCondition(code: number, isDay: boolean): WeatherCondition {
+function toCondition(code: number): WeatherCondition {
   if (code === 0) {
     return "clear";
   }
@@ -209,7 +209,7 @@ function toCondition(code: number, isDay: boolean): WeatherCondition {
     return "rain";
   }
 
-  return isDay ? "clear" : "sunset";
+  return "clear";
 }
 
 function mapImdCodeToCondition(code: number | undefined, fallback: WeatherCondition): WeatherCondition {
@@ -265,36 +265,138 @@ function describeCondition(condition: WeatherCondition): string {
   }
 }
 
-function formatUpdatedAt(isoTime: string, timeZone?: string) {
-  const date = new Date(isoTime);
-  const opts: Intl.DateTimeFormatOptions = {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  };
-
-  if (timeZone) {
-    opts.timeZone = timeZone;
-  }
-
-  return date.toLocaleTimeString([], opts);
+interface TimeParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
 }
 
-function formatHourLabel(isoTime: string, isNow = false) {
+function parseTimeParts(isoTime: string): TimeParts | null {
+  const trimmed = isoTime.trim();
+
+  // Local string with no timezone offset (e.g., "2026-03-30T01:00" or "2026-03-30 01:00").
+  const localMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (localMatch) {
+    return {
+      year: Number(localMatch[1]),
+      month: Number(localMatch[2]),
+      day: Number(localMatch[3]),
+      hour: Number(localMatch[4]),
+      minute: Number(localMatch[5]),
+      second: Number(localMatch[6] ?? "0")
+    };
+  }
+
+  // ISO with timezone/UTC offset (e.g., "2026-03-30T01:00Z", "2026-03-30T01:00+05:30").
+  const offsetMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(Z|[+\-]\d{2}:?\d{2})$/);
+  if (offsetMatch) {
+    return {
+      year: Number(offsetMatch[1]),
+      month: Number(offsetMatch[2]),
+      day: Number(offsetMatch[3]),
+      hour: Number(offsetMatch[4]),
+      minute: Number(offsetMatch[5]),
+      second: Number(offsetMatch[6] ?? "0")
+    };
+  }
+
+  // Fallback: parse as Date and use UTC components.
+  const date = new Date(trimmed);
+  if (!Number.isNaN(date.getTime())) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+      hour: date.getUTCHours(),
+      minute: date.getUTCMinutes(),
+      second: date.getUTCSeconds()
+    };
+  }
+
+  return null;
+}
+
+function timePartsToTimestamp(parts: TimeParts): number {
+  // Use UTC to compute a comparable value independent of local host timezone.
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+function toComparableTimestamp(isoTime: string): number {
+  const tzMatch = /(?:Z|[+\-]\d{2}:?\d{2})$/.test(isoTime.trim());
+  if (tzMatch) {
+    const date = new Date(isoTime);
+    if (!Number.isNaN(date.getTime())) {
+      return date.getTime();
+    }
+  }
+
+  const parts = parseTimeParts(isoTime);
+  if (!parts) {
+    return NaN;
+  }
+
+  return timePartsToTimestamp(parts);
+}
+
+function formatHourLabel(isoTime: string | Date, isNow = false) {
   if (isNow) {
     return "Now";
   }
 
-  const date = new Date(isoTime);
-  if (Number.isNaN(date.getTime())) {
+  let parts: TimeParts | null = null;
+
+  if (isoTime instanceof Date) {
+    parts = {
+      year: isoTime.getFullYear(),
+      month: isoTime.getMonth() + 1,
+      day: isoTime.getDate(),
+      hour: isoTime.getHours(),
+      minute: isoTime.getMinutes(),
+      second: isoTime.getSeconds()
+    };
+  } else {
+    parts = parseTimeParts(isoTime);
+  }
+
+  if (!parts) {
     return "--";
   }
 
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
+  let hour = parts.hour;
+  const minute = parts.minute;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12;
+  if (hour === 0) {
+    hour = 12;
+  }
+
+  const minuteStr = `${minute}`.padStart(2, "0");
+  return `${hour}:${minuteStr} ${ampm}`;
+}
+
+function formatUpdatedAt(isoTime: string, timeZone?: string) {
+  const parts = parseTimeParts(isoTime);
+
+  if (!parts) {
+    return "--";
+  }
+
+  let date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second));
+
+  if (timeZone) {
+    const options: Intl.DateTimeFormatOptions = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone
+    };
+    return date.toLocaleTimeString([], options);
+  }
+
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 const RAD = Math.PI / 180;
@@ -633,10 +735,10 @@ function buildHourlySlices(
   hourly: NonNullable<ForecastResponse["hourly"]>,
   currentTime: string
 ) {
-  const currentTimestamp = new Date(currentTime).getTime();
+  const currentTimestamp = toComparableTimestamp(currentTime);
   const startIndex = Math.max(
     0,
-    hourly.time.findIndex((time) => new Date(time).getTime() >= currentTimestamp)
+    hourly.time.findIndex((time) => toComparableTimestamp(time) >= currentTimestamp)
   );
 
   const forecast = Array.from({ length: 4 }, (_, index) => startIndex + index * 2)
@@ -644,7 +746,7 @@ function buildHourlySlices(
     .map((index, offset) => ({
       label: formatHourLabel(hourly.time[index], offset === 0),
       temperatureC: hourly.temperature_2m[index],
-      condition: toCondition(hourly.weather_code[index], hourly.is_day[index] === 1)
+      condition: toCondition(hourly.weather_code[index])
     }));
 
   const hourlyDetails = Array.from({ length: 6 }, (_, index) => startIndex + index)
@@ -652,7 +754,7 @@ function buildHourlySlices(
     .map((index, offset) => ({
       label: formatHourLabel(hourly.time[index], offset === 0),
       temperatureC: hourly.temperature_2m[index],
-      condition: toCondition(hourly.weather_code[index], hourly.is_day[index] === 1),
+      condition: toCondition(hourly.weather_code[index]),
       windKph: hourly.wind_speed_10m[index],
       uvIndex: hourly.uv_index[index]
     }));
@@ -691,7 +793,7 @@ async function fetchHistoricalData(latitude: number, longitude: number, timezone
       temperatureMaxC: daily.temperature_2m_max[index] ?? 0,
       temperatureMinC: daily.temperature_2m_min[index] ?? 0,
       temperatureAvgC: daily.temperature_2m_mean[index] ?? 0,
-      condition: toCondition(daily.weather_code[index] ?? 0, true),
+      condition: toCondition(daily.weather_code[index] ?? 0),
       precipitationMm: daily.precipitation_sum[index] ?? 0
     }));
   } catch {
@@ -730,14 +832,18 @@ async function fetchAstronomyData(latitude: number, longitude: number, timezone?
 
   let sunrise: string | undefined;
   let sunset: string | undefined;
+  let sunriseIso: string | undefined;
+  let sunsetIso: string | undefined;
 
   try {
     const response = await desktopFetchJson<AstronomyResponse>(safeAstronomyUrl.toString());
     const daily = response.daily;
 
     if (daily && daily.time && daily.time.length > 0) {
-      sunrise = formatTime(daily.sunrise?.[0], timezone);
-      sunset = formatTime(daily.sunset?.[0], timezone);
+      sunriseIso = daily.sunrise?.[0];
+      sunsetIso = daily.sunset?.[0];
+      sunrise = formatTime(sunriseIso, timezone);
+      sunset = formatTime(sunsetIso, timezone);
     }
   } catch (error) {
     console.warn("Astronomy sunrise/sunset fetch failed:", error);
@@ -747,6 +853,9 @@ async function fetchAstronomyData(latitude: number, longitude: number, timezone?
   // Try to request them separately in case they become available.
   let moonrise: string | undefined;
   let moonset: string | undefined;
+
+  let moonriseIso: string | undefined;
+  let moonsetIso: string | undefined;
 
   try {
     const moonUrl = new URL("https://api.open-meteo.com/v1/forecast");
@@ -760,8 +869,10 @@ async function fetchAstronomyData(latitude: number, longitude: number, timezone?
     const daily = response.daily;
 
     if (daily && daily.time && daily.time.length > 0) {
-      moonrise = formatTime(daily.moonrise?.[0], timezone);
-      moonset = formatTime(daily.moonset?.[0], timezone);
+      moonriseIso = daily.moonrise?.[0];
+      moonsetIso = daily.moonset?.[0];
+      moonrise = formatTime(moonriseIso, timezone);
+      moonset = formatTime(moonsetIso, timezone);
     }
   } catch {
     // Ignore, keep as undefined.
@@ -782,8 +893,30 @@ async function fetchAstronomyData(latitude: number, longitude: number, timezone?
     sunrise,
     sunset,
     moonrise,
-    moonset
+    moonset,
+    sunriseIso,
+    sunsetIso,
+    moonriseIso,
+    moonsetIso
   };
+}
+
+function isDaylight(currentIso: string, sunriseIso?: string, sunsetIso?: string): boolean {
+  const now = new Date(currentIso);
+  if (Number.isNaN(now.getTime())) {
+    return true; // fallback to daytime
+  }
+
+  if (sunriseIso && sunsetIso) {
+    const sunriseDate = new Date(sunriseIso);
+    const sunsetDate = new Date(sunsetIso);
+
+    if (!Number.isNaN(sunriseDate.getTime()) && !Number.isNaN(sunsetDate.getTime())) {
+      return now >= sunriseDate && now < sunsetDate;
+    }
+  }
+
+  return true;
 }
 
 async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapshot> {
@@ -807,14 +940,14 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
   }
 
   const effectiveTimezone = forecastData.timezone ?? match.timezone;
-  const condition = toCondition(current.weather_code, current.is_day === 1);
+  const astronomyData = await fetchAstronomyData(match.latitude, match.longitude, match.timezone);
+
+  const isNight = !isDaylight(current.time, astronomyData.sunriseIso, astronomyData.sunsetIso);
+  const condition = toCondition(current.weather_code);
   const { forecast, hourlyDetails } = buildHourlySlices(hourly, current.time);
 
   // Fetch historical data (last 10 days)
   const historicalData = await fetchHistoricalData(match.latitude, match.longitude, match.timezone);
-
-  // Fetch astronomy data
-  const astronomyData = await fetchAstronomyData(match.latitude, match.longitude, match.timezone);
 
   // Build specific location string if admin2 or admin3 available
   let specificLocation: string | undefined;
@@ -826,6 +959,8 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     city: match.name,
     region: match.admin1 ? `${match.admin1}, ${match.country}` : match.country,
     specificLocation,
+    latitude: match.latitude,
+    longitude: match.longitude,
     timezone: effectiveTimezone,
     temperatureC: current.temperature_2m,
     feelsLikeC: current.apparent_temperature,
@@ -836,6 +971,7 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     summary: describeCondition(condition),
     updatedAt: formatUpdatedAt(current.time, effectiveTimezone),
     source: "Open-Meteo",
+    isNight,
     sunrise: astronomyData.sunrise,
     sunset: astronomyData.sunset,
     moonrise: astronomyData.moonrise,
@@ -860,6 +996,122 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     ...imdSupplement,
     source: imdSupplement.source ?? "Open-Meteo + IMD"
   };
+}
+
+export async function fetchOpenMeteoService(
+  service: string,
+  latitude: number,
+  longitude: number,
+  timezone?: string
+): Promise<unknown> {
+  const base = (url: string) => desktopFetchJson<unknown>(url);
+
+  switch (service) {
+    case "weather-forecast": {
+      const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
+      forecastUrl.searchParams.set("latitude", `${latitude}`);
+      forecastUrl.searchParams.set("longitude", `${longitude}`);
+      forecastUrl.searchParams.set("current", "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day,uv_index");
+      forecastUrl.searchParams.set("hourly", "temperature_2m,weather_code,wind_speed_10m,uv_index,is_day");
+      forecastUrl.searchParams.set("forecast_days", "1");
+      forecastUrl.searchParams.set("timezone", timezone ?? "auto");
+      return base(forecastUrl.toString());
+    }
+    case "historical-weather": {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const startDate = new Date(yesterday);
+      startDate.setDate(startDate.getDate() - 9);
+      const formatDate = (d: Date) => d.toISOString().split("T")[0];
+
+      const archiveUrl = new URL("https://archive-api.open-meteo.com/v1/archive");
+      archiveUrl.searchParams.set("latitude", `${latitude}`);
+      archiveUrl.searchParams.set("longitude", `${longitude}`);
+      archiveUrl.searchParams.set("start_date", formatDate(startDate));
+      archiveUrl.searchParams.set("end_date", formatDate(yesterday));
+      archiveUrl.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum");
+      archiveUrl.searchParams.set("timezone", timezone ?? "auto");
+      return base(archiveUrl.toString());
+    }
+    case "ensemble-models": {
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("models", "ecmwf,meteo-fr,ukmo");
+      url.searchParams.set("hourly", "temperature_2m,weather_code");
+      url.searchParams.set("forecast_days", "2");
+      url.searchParams.set("timezone", timezone ?? "auto");
+      return base(url.toString());
+    }
+    case "seasonal-forecast": {
+      const url = new URL("https://climate-api.open-meteo.com/v1/climate");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("start_year", "1991");
+      url.searchParams.set("end_year", "2020");
+      url.searchParams.set("climate_model", "ERA5");
+      url.searchParams.set("temperature_unit", "celsius");
+      return base(url.toString());
+    }
+    case "climate-change": {
+      const url = new URL("https://climate-api.open-meteo.com/v1/climate");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("start_year", "1991");
+      url.searchParams.set("end_year", "2100");
+      url.searchParams.set("temperature_unit", "celsius");
+      return base(url.toString());
+    }
+    case "marine-forecast": {
+      const url = new URL("https://marine-api.open-meteo.com/v1/marine");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("hourly", "wave_height,swell_wave_height,swell_wave_period,swell_wave_direction");
+      url.searchParams.set("timezone", timezone ?? "auto");
+      return base(url.toString());
+    }
+    case "air-quality": {
+      const url = new URL("https://air-quality-api.open-meteo.com/v1/air-quality");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("hourly", "pm2_5,pm10,us_aqi");
+      url.searchParams.set("timezone", timezone ?? "auto");
+      return base(url.toString());
+    }
+    case "satellite-radiation": {
+      const url = new URL("https://radiation-api.open-meteo.com/v1/radiation");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("hourly", "global_radiation");
+      url.searchParams.set("timezone", timezone ?? "auto");
+      return base(url.toString());
+    }
+    case "geocoding": {
+      const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+      geocodeUrl.searchParams.set("name", `${latitude},${longitude}`);
+      geocodeUrl.searchParams.set("count", "5");
+      geocodeUrl.searchParams.set("language", "en");
+      geocodeUrl.searchParams.set("format", "json");
+      return base(geocodeUrl.toString());
+    }
+    case "elevation": {
+      const url = new URL("https://api.open-meteo.com/v1/elevation");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      return base(url.toString());
+    }
+    case "flood": {
+      const url = new URL("https://flood-api.open-meteo.com/v1/flood");
+      url.searchParams.set("latitude", `${latitude}`);
+      url.searchParams.set("longitude", `${longitude}`);
+      url.searchParams.set("hourly", "river_discharge");
+      url.searchParams.set("timezone", timezone ?? "auto");
+      return base(url.toString());
+    }
+    default:
+      throw new Error(`Unsupported Open-Meteo service: ${service}`);
+  }
 }
 
 export async function fetchLiveWeather(query: string): Promise<WeatherSnapshot> {

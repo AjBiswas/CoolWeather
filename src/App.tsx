@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { WeatherScene } from "./components/WeatherScene";
 import { fallbackWeather } from "./data/mockWeather";
-import { fetchLiveWeather, fetchLiveWeatherByCoords, fetchLiveWeatherByIp } from "./lib/liveWeather";
+import {
+  fetchLiveWeather,
+  fetchLiveWeatherByCoords,
+  fetchLiveWeatherByIp,
+  fetchOpenMeteoService
+} from "./lib/liveWeather";
 import type { WeatherSnapshot } from "./types";
 
 const BASE_WIDGET_WIDTH = 560;
@@ -52,22 +57,30 @@ function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function displayConditionName(value: WeatherSnapshot["condition"]) {
+function displayConditionName(value: WeatherSnapshot["condition"], isNight: boolean = false) {
+  const daySuffix = isNight ? " Night" : "";
+
   switch (value) {
     case "clear":
-      return "Sunny";
+      return `Clear Sky${daySuffix}`;
     case "cloudy":
-      return "Cloud Cover";
+      return `Cloudy${daySuffix}`;
     case "rain":
-      return "Rain Flow";
+      return `Rainy${daySuffix}`;
     case "storm":
-      return "Storm Pulse";
+      return `Storm${daySuffix}`;
     case "snow":
-      return "Snow Drift";
+      return `Snow${daySuffix}`;
+    case "mostly-sunny":
+      return `Mostly Sunny${daySuffix}`;
+    case "partly-cloudy":
+      return `Partly Cloudy${daySuffix}`;
+    case "haze":
+      return `Haze${daySuffix}`;
     case "sunset":
-      return "Night Sky";
+      return "Sunset Glow";
     default:
-      return titleCase(value);
+      return titleCase(value) + (isNight ? " Night" : "");
   }
 }
 
@@ -82,6 +95,67 @@ function getUvLabel(value: number) {
     return "Moderate";
   }
   return "Low";
+}
+
+function renderOpenMeteoData(data: unknown): JSX.Element {
+  if (data === null || data === undefined) {
+    return <p>No data available.</p>;
+  }
+
+  if (Array.isArray(data)) {
+    return (
+      <div>
+        <p>Items: {data.length}</p>
+        <ul>
+          {data.slice(0, 5).map((item, idx) => (
+            <li key={idx}>{typeof item === "object" ? JSON.stringify(item) : String(item)}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    const firstKeys = Object.keys(obj).slice(0, 20);
+    return (
+      <div className="open-meteo-service-data">
+        {firstKeys.map((key) => {
+          const value = obj[key];
+          if (value === null || value === undefined) {
+            return null;
+          }
+
+          if (typeof value === "object") {
+            if (Array.isArray(value)) {
+              return (
+                <div key={key} className="open-meteo-service-row">
+                  <strong>{key}</strong>: array ({value.length})
+                </div>
+              );
+            }
+
+            return (
+              <div key={key} className="open-meteo-service-row">
+                <strong>{key}</strong>: {JSON.stringify(value)}
+              </div>
+            );
+          }
+
+          return (
+            <div key={key} className="open-meteo-service-row">
+              <strong>{key}</strong>: {String(value)}
+            </div>
+          );
+        })}
+        {Object.keys(obj).length > firstKeys.length ? (
+          <em>... {Object.keys(obj).length - firstKeys.length} more keys</em>
+        ) : null}
+      </div>
+    );
+  }
+
+  return <p>{String(data)}</p>;
 }
 
 function getCurrentPosition() {
@@ -102,12 +176,56 @@ function getCurrentPosition() {
 export default function App() {
   const [weather, setWeather] = useState<WeatherSnapshot>(fallbackWeather);
   const [status, setStatus] = useState("Loading location...");
+  const [appError, setAppError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log("App starting", { weather, status });
+  }, []);
+
+  if (appError) {
+    return (
+      <main
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "#11263d",
+          color: "white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px"
+        }}
+      >
+        <div>
+          <h1>App initialization error</h1>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{appError}</pre>
+        </div>
+      </main>
+    );
+  }
+
   const [widgetSize, setWidgetSize] = useState({ width: BASE_WIDGET_WIDTH, height: BASE_WIDGET_HEIGHT });
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [manualQuery, setManualQuery] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
+  const [selectedOpenMeteoService, setSelectedOpenMeteoService] = useState("weather-forecast");
+  const [openMeteoServiceData, setOpenMeteoServiceData] = useState<unknown>(null);
+  const [openMeteoServiceError, setOpenMeteoServiceError] = useState<string | null>(null);
+  const [openMeteoServiceLoading, setOpenMeteoServiceLoading] = useState(false);
+
+  const OPEN_METEO_SERVICES = [
+    { id: "seasonal-forecast", label: "Seasonal Forecast" },
+    { id: "climate-change", label: "Climate Change" },
+    { id: "marine-forecast", label: "Marine Forecast" },
+    { id: "air-quality", label: "Air Quality" },
+    { id: "satellite-radiation", label: "Satellite Radiation" },
+    { id: "geocoding", label: "Geocoding" },
+    { id: "elevation", label: "Elevation" },
+    { id: "flood", label: "Flood" }
+  ];
+
   const widgetRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -146,7 +264,7 @@ export default function App() {
           const liveWeather = await fetchLiveWeather(manualQuery);
           if (active) {
             setWeather(liveWeather);
-            setStatus(`Location: ${liveWeather.city}`);
+            setStatus(`${liveWeather.city}`);
             setPanelMessage(null);
           }
         } catch {
@@ -162,7 +280,7 @@ export default function App() {
         const liveWeather = await fetchLiveWeatherByCoords(position.coords.latitude, position.coords.longitude);
         if (active) {
           setWeather(liveWeather);
-          setStatus(`Location: ${liveWeather.city}`);
+          setStatus(`${liveWeather.city}`);
           setPanelMessage(null);
         }
         return;
@@ -176,14 +294,20 @@ export default function App() {
         const liveWeather = await fetchLiveWeatherByIp();
         if (active) {
           setWeather(liveWeather);
-          setStatus(`Location: ${liveWeather.city}`);
+          setStatus(`${liveWeather.city}`);
           setPanelMessage(null);
         }
-      } catch {
+      } catch (error) {
         if (active) {
           setWeather(zeroWeather);
           setStatus("Location unavailable");
           setPanelMessage("Search a city to load live details.");
+          if (error instanceof Error) {
+            setAppError(error.message);
+          } else {
+            setAppError(String(error));
+          }
+          console.error("loadWeather catch:", error);
         }
       }
     };
@@ -201,7 +325,10 @@ export default function App() {
 
   const showTempPlaceholder = weather.source === "Fallback";
   const temperatureDisplay = displayTemp(weather.temperatureC, showTempPlaceholder);
-  const usesDarkNumber = ["clear", "cloudy", "sunset", "snow"].includes(weather.condition);
+  const usesDarkNumber =
+  ["clear", "cloudy", "sunset", "snow"].includes(weather.condition) &&
+  !weather.isNight;
+  const historicalData = weather.historicalData ?? [];
 
   const layout = useMemo(() => {
     const widthRatio = widgetSize.width / BASE_WIDGET_WIDTH;
@@ -253,20 +380,18 @@ export default function App() {
 
   const numberBackStyle = {
     transform: `translate(${layout.depthBack}px, ${layout.depthBack}px) scaleY(1.18)`,
-    color: usesDarkNumber ? "rgba(67, 26, 32, 0.2)" : "rgba(178, 62, 70, 0.18)"
+    color: "rgba(0, 0, 0, 0.12)"
   } as CSSProperties;
 
   const numberSideStyle = {
     transform: `translate(${layout.depthSide}px, ${layout.depthSide}px) scaleY(1.18)`,
-    color: usesDarkNumber ? "rgba(90, 36, 42, 0.78)" : "rgba(178, 62, 70, 0.9)",
-    textShadow: usesDarkNumber
-      ? `0 ${Math.max(3, Math.round(layout.numberFontSize * 0.026))}px ${Math.max(6, Math.round(layout.numberFontSize * 0.052))}px rgba(70, 28, 34, 0.16)`
-      : `0 ${Math.max(3, Math.round(layout.numberFontSize * 0.026))}px ${Math.max(6, Math.round(layout.numberFontSize * 0.052))}px rgba(178, 62, 70, 0.14)`
+    color: "rgba(0, 0, 0, 0.35)",
+    textShadow: `0 4px 12px rgba(0,0,0,0.2)`
   } as CSSProperties;
 
  const numberFrontStyle = {
   ...numberTextStyle,
-  color: usesDarkNumber ? "#1f2937" : "#ffffff",
+  color: usesDarkNumber ? "#111827" : "#ffffff",
   textShadow: usesDarkNumber
     ? `
       0 1px 0 rgba(255,255,255,0.25),
@@ -286,6 +411,9 @@ export default function App() {
 
   const labelStyle = {
     top: `${layout.labelTop}px`,
+    left: "50%",
+    transform: "translateX(-50%)",
+    textAlign: "center",
     fontSize: `${layout.labelFontSize}px`,
     color: "rgba(245, 248, 255, 0.94)",
     textShadow: "0 2px 12px rgba(10, 18, 32, 0.32)"
@@ -293,6 +421,9 @@ export default function App() {
 
   const statusStyle = {
     top: `${layout.statusTop}px`,
+    left: "50%",
+    transform: "translateX(-50%)",
+    textAlign: "center",
     fontSize: `${layout.statusFontSize}px`,
     color: "rgba(238, 242, 248, 0.78)",
     textShadow: "0 1px 10px rgba(10, 18, 32, 0.18)"
@@ -311,7 +442,7 @@ export default function App() {
     try {
       const liveWeather = await fetchLiveWeather(query);
       setWeather(liveWeather);
-      setStatus(`Location: ${liveWeather.city}`);
+      setStatus(`${liveWeather.city}`);
       setManualQuery(query);
       setSearchValue("");
     } catch {
@@ -321,17 +452,38 @@ export default function App() {
     }
   };
 
+  const loadOpenMeteoService = async (serviceId: string) => {
+    if (!weather.latitude || !weather.longitude) {
+      setOpenMeteoServiceError("Location latitude/longitude not available yet.");
+      return;
+    }
+
+    setSelectedOpenMeteoService(serviceId);
+    setOpenMeteoServiceLoading(true);
+    setOpenMeteoServiceError(null);
+    setOpenMeteoServiceData(null);
+
+    try {
+      const result = await fetchOpenMeteoService(serviceId, weather.latitude, weather.longitude, weather.timezone);
+      setOpenMeteoServiceData(result);
+    } catch (error) {
+      setOpenMeteoServiceError(error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setOpenMeteoServiceLoading(false);
+    }
+  };
+
   const handleUseCurrentLocation = () => {
     setManualQuery(null);
     setPanelMessage(null);
   };
 
   return (
-    <main className={`poster-shell condition-${weather.condition}`}>
-      <section className="poster-widget" ref={widgetRef}>
+    <main className={`poster-shell condition-${weather.condition}`} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <section className="poster-widget" ref={widgetRef} style={{ position: "relative", zIndex: 1, overflow: "hidden" }}>
         <div className="poster-frame poster-scene-frame" style={sceneFrameStyle}>
           <div className="poster-scene">
-            <WeatherScene condition={weather.condition} temperature={weather.temperatureC} />
+            <WeatherScene condition={weather.condition} temperature={weather.temperatureC} isNight={Boolean(weather.isNight)} />
           </div>
         </div>
 
@@ -355,7 +507,7 @@ export default function App() {
           </button>
 
           <div className="poster-label" style={labelStyle}>
-            {titleCase(weather.condition)}
+            {displayConditionName(weather.condition, Boolean(weather.isNight))}
           </div>
 
           <div className="poster-status" style={statusStyle}>
@@ -389,7 +541,7 @@ export default function App() {
                     <span className="detail-temp-separator">&nbsp;&nbsp;</span>
                     <span className="detail-temp-f">{showTempPlaceholder ? "--" : `${toFahrenheit(weather.temperatureC)}°`}F</span>
                   </div>
-                  <div className="detail-tone-pill">{displayConditionName(weather.condition)}</div>
+                  <div className="detail-tone-pill">{displayConditionName(weather.condition, Boolean(weather.isNight))}</div>
                   <p className="detail-summary-text">{weather.summary}</p>
                 </div>
 
@@ -425,7 +577,7 @@ export default function App() {
               <section className="detail-ribbon-zone">
                 <div className="detail-section-head">
                   <span>Next Hours</span>
-                  <span>{displayConditionName(weather.condition)}</span>
+                  <span>{displayConditionName(weather.condition, Boolean(weather.isNight))}</span>
                 </div>
                 <div className="detail-ribbon-scroll">
                   {weather.hourlyDetails.map((item) => (
@@ -475,21 +627,13 @@ export default function App() {
                 </div>
               </section>
 
-              <section className="detail-debug">
-                <p><strong>DEBUG astronomy raw:</strong></p>
-                <p>sunrise: {String(weather.sunrise)}</p>
-                <p>sunset: {String(weather.sunset)}</p>
-                <p>moonrise: {String(weather.moonrise)}</p>
-                <p>moonset: {String(weather.moonset)}</p>
-              </section>
-
-              {weather.historicalData && weather.historicalData.length > 0 && (
+              {historicalData.length > 0 && (
                 <section className="detail-historical-zone">
                   <div className="detail-section-head">
                     <span>Last 10 Days</span>
                   </div>
                   <div className="historical-grid">
-                    {weather.historicalData.map((item) => (
+                    {historicalData.map((item) => (
                       <article key={item.date} className="historical-card">
                         <span className="historical-date">
                           {new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -507,6 +651,37 @@ export default function App() {
                   </div>
                 </section>
               )}
+
+              <section className="detail-open-meteo-tools">
+                <div className="detail-section-head">
+                  <span>Open-Meteo API panel</span>
+                  <small>Select any free Open-Meteo service to fetch live data for this location.</small>
+                </div>
+                <div className="open-meteo-service-list">
+                  {OPEN_METEO_SERVICES.map((service) => (
+                    <button
+                      key={service.id}
+                      type="button"
+                      className={`open-meteo-service-button${service.id === selectedOpenMeteoService ? " active" : ""}`}
+                      onClick={() => void loadOpenMeteoService(service.id)}
+                    >
+                      {service.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="open-meteo-service-output">
+                  {openMeteoServiceLoading ? (
+                    <p>Loading {OPEN_METEO_SERVICES.find((s) => s.id === selectedOpenMeteoService)?.label}…</p>
+                  ) : openMeteoServiceError ? (
+                    <p className="error">{openMeteoServiceError}</p>
+                  ) : openMeteoServiceData ? (
+                    renderOpenMeteoData(openMeteoServiceData)
+                  ) : (
+                    <p>No Open-Meteo service loaded yet.</p>
+                  )}
+                </div>
+              </section>
 
               <section className="detail-search-dock">
                 <form className="search-glass" onSubmit={handleSearch}>

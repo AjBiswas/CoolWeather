@@ -32,6 +32,7 @@ function createWindow() {
     autoHideMenuBar: true,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     show: false,
     hasShadow: false
   });
@@ -60,6 +61,14 @@ function createWindow() {
     console.log("Window ready to show.");
     win.show();
   });
+
+  // Fallback in case ready-to-show doesn't fire quickly
+  setTimeout(() => {
+    if (!win.isVisible()) {
+      console.warn("Window not visible by timeout, forcing show.");
+      win.show();
+    }
+  }, 3000);
 }
 
 app.whenReady().then(() => {
