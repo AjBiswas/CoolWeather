@@ -1045,13 +1045,11 @@ export async function fetchOpenMeteoService(
       return base(url.toString());
     }
     case "seasonal-forecast": {
-      const url = new URL("https://climate-api.open-meteo.com/v1/climate");
+      const url = new URL("https://seasonal-api.open-meteo.com/v1/seasonal");
       url.searchParams.set("latitude", `${latitude}`);
       url.searchParams.set("longitude", `${longitude}`);
-      url.searchParams.set("start_year", "1991");
-      url.searchParams.set("end_year", "2020");
-      url.searchParams.set("climate_model", "ERA5");
-      url.searchParams.set("temperature_unit", "celsius");
+      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum");
+      url.searchParams.set("timezone", timezone ?? "auto");
       return base(url.toString());
     }
     case "climate-change": {
@@ -1061,6 +1059,8 @@ export async function fetchOpenMeteoService(
       url.searchParams.set("start_year", "1991");
       url.searchParams.set("end_year", "2100");
       url.searchParams.set("temperature_unit", "celsius");
+      url.searchParams.set("models", "CMCC_CM2_VHR4");
+      url.searchParams.set("daily", "temperature_2m_max");
       return base(url.toString());
     }
     case "marine-forecast": {
@@ -1075,7 +1075,7 @@ export async function fetchOpenMeteoService(
       const url = new URL("https://air-quality-api.open-meteo.com/v1/air-quality");
       url.searchParams.set("latitude", `${latitude}`);
       url.searchParams.set("longitude", `${longitude}`);
-      url.searchParams.set("hourly", "pm2_5,pm10,us_aqi");
+      url.searchParams.set("current", "pm2_5,pm10,us_aqi");
       url.searchParams.set("timezone", timezone ?? "auto");
       return base(url.toString());
     }
@@ -1105,7 +1105,7 @@ export async function fetchOpenMeteoService(
       const url = new URL("https://flood-api.open-meteo.com/v1/flood");
       url.searchParams.set("latitude", `${latitude}`);
       url.searchParams.set("longitude", `${longitude}`);
-      url.searchParams.set("hourly", "river_discharge");
+      url.searchParams.set("daily", "river_discharge");
       url.searchParams.set("timezone", timezone ?? "auto");
       return base(url.toString());
     }

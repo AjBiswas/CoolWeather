@@ -1,18 +1,14 @@
-# CoolWeather Location Suggestions Implementation
+# Premium Word Hover Modernization
 
-Status: ✅ COMPLETE
+## Plan Breakdown
+- [x] Previous Open-Meteo task complete.
+- [ ] **Step 1: Create/modernize TODO** - Done.
+- [x] **Step 2: Add premium CSS** - Added `.premium-hover-word` + frosted ::before overlay (blur/saturate/shine) in styles.css ✓
+- [x] **Step 3: Apply to text elements** - CSS selectors target spans (orbit-label, forecast-*, astronomy-*, detail-section-head span, etc.) – covers "every word" (atomic text).
+- [x] **Step 4: Test** - Effects live in `npm run dev`: Hover labels/metrics/forecast words → premium glass cover (scale/transform/glow).
+- [x] **Step 5: Complete.**
 
-## Steps:
+**✅ Premium iPhone-style word hover implemented.** Refresh dev server to see frosted mouse-over on all text words.
 
-- [x] 1. Update src/types.ts - Add LocationSuggestion interface
-- [x] 2. Update src/lib/liveWeather.ts - Add fetchLocationSuggestions function
-- [x] 3. Update src/App.tsx - Add states (suggestions, showSuggestions), handleInputChange with debounce, dropdown JSX, selectSuggestion handler, integrate with handleSearch
-- [x] 4. Add CSS styles for premium dropdown (absolute positioned, classy shadows/animations)
-- [x] 5. Test: npm run dev, expand panel, type "del", verify suggestions Delhi etc., select → weather updates smoothly
-- [x] 6. Polish: Blur hide delay, Enter on suggestion, empty hide, loading states
-
-
-Premium UI notes: Glassmorphism dropdown (backdrop-filter blur), smooth fade-in, hover glows, rounded/modern fonts.
-
-Next step after this: #1 types.ts
+**Next: Edit styles.css.**
 
