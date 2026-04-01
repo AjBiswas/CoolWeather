@@ -20,6 +20,8 @@ export interface WeatherSnapshot {
   humidity: number;
   windKph: number;
   uvIndex: number;
+  aqi?: number;
+  aqiStatus?: string;
   condition: WeatherCondition;
   summary: string;
   updatedAt: string;
@@ -79,6 +81,8 @@ export interface WeatherSnapshot {
   humidity: number;
   windKph: number;
   uvIndex: number;
+  aqi?: number;
+  aqiStatus?: string;
   condition: WeatherCondition;
   summary: string;
   updatedAt: string;

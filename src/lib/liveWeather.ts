@@ -71,6 +71,12 @@ interface AstronomyResponse {
   };
 }
 
+interface AirQualityResponse {
+  current?: {
+    us_aqi?: number;
+  };
+}
+
 interface ImdCurrentLike {
   City?: string;
   city?: string;
@@ -484,22 +490,25 @@ function getMoonTimes(date: Date, lat: number, lng: number) {
   let set: Date | undefined;
   let prev = moonPosition(start, lat, lng);
   let prevAlt = prev.altitude - hc;
-
-  for (let hour = 1; hour <= 24; hour++) {
+  // A lunar day is ~24h 50m, so we might miss an event in a 24h window.
+  // Let's check over a 36-hour period to be sure to find the next rise and set.
+  // A 36-hour window may not be enough if the next rise is near the end of
+  // the window. A 50-hour window should be sufficient to find the next rise and set.
+  for (let hour = 1; hour <= 50; hour++) {
     const instant = new Date(start.getTime() + hour * 3600000);
     const current = moonPosition(instant, lat, lng);
     const currentAlt = current.altitude - hc;
 
-    if (prevAlt <= 0 && currentAlt > 0) {
+    if (!rise && prevAlt <= 0 && currentAlt > 0) {
       const t = hour - 1 + (0 - prevAlt) / (currentAlt - prevAlt);
       rise = new Date(start.getTime() + t * 3600000);
     }
 
-    if (prevAlt >= 0 && currentAlt < 0) {
+    if (!set && prevAlt >= 0 && currentAlt < 0) {
       const t = hour - 1 + (0 - prevAlt) / (currentAlt - prevAlt);
       set = new Date(start.getTime() + t * 3600000);
     }
-
+    if (rise && set) break;
     prevAlt = currentAlt;
   }
 
@@ -849,45 +858,12 @@ async function fetchAstronomyData(latitude: number, longitude: number, timezone?
     console.warn("Astronomy sunrise/sunset fetch failed:", error);
   }
 
-  // Moonrise/moonset are not consistently available in this version of Open-Meteo API.
-  // Try to request them separately in case they become available.
-  let moonrise: string | undefined;
-  let moonset: string | undefined;
-
-  let moonriseIso: string | undefined;
-  let moonsetIso: string | undefined;
-
-  try {
-    const moonUrl = new URL("https://api.open-meteo.com/v1/forecast");
-    moonUrl.searchParams.set("latitude", `${latitude}`);
-    moonUrl.searchParams.set("longitude", `${longitude}`);
-    moonUrl.searchParams.set("daily", "moonrise,moonset");
-    moonUrl.searchParams.set("forecast_days", "1");
-    moonUrl.searchParams.set("timezone", timezone ?? "auto");
-
-    const response = await desktopFetchJson<AstronomyResponse>(moonUrl.toString());
-    const daily = response.daily;
-
-    if (daily && daily.time && daily.time.length > 0) {
-      moonriseIso = daily.moonrise?.[0];
-      moonsetIso = daily.moonset?.[0];
-      moonrise = formatTime(moonriseIso, timezone);
-      moonset = formatTime(moonsetIso, timezone);
-    }
-  } catch {
-    // Ignore, keep as undefined.
-  }
-
-  // If moonrise/moonset are still missing, try local estimate.
-  if (!moonrise || !moonset) {
-    const estimate = getMoonTimes(new Date(), latitude, longitude);
-    if (!moonrise && estimate.rise) {
-      moonrise = formatTime(estimate.rise.toISOString(), timezone);
-    }
-    if (!moonset && estimate.set) {
-      moonset = formatTime(estimate.set.toISOString(), timezone);
-    }
-  }
+  // Moonrise/moonset are not available in the Open-Meteo Forecast API, so we calculate them locally.
+  const { rise: moonriseDate, set: moonsetDate } = getMoonTimes(new Date(), latitude, longitude);
+  const moonrise = moonriseDate ? formatTime(moonriseDate.toISOString(), timezone) : undefined;
+  const moonset = moonsetDate ? formatTime(moonsetDate.toISOString(), timezone) : undefined;
+  const moonriseIso = moonriseDate?.toISOString();
+  const moonsetIso = moonsetDate?.toISOString();
 
   return {
     sunrise,
@@ -955,6 +931,28 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     specificLocation = match.admin3 ? `${match.admin3}, ${match.admin2}` : match.admin2;
   }
 
+  let aqi: number | undefined;
+  let aqiStatus: string | undefined;
+  try {
+    const aqiUrl = new URL("https://air-quality-api.open-meteo.com/v1/air-quality");
+    aqiUrl.searchParams.set("latitude", `${match.latitude}`);
+    aqiUrl.searchParams.set("longitude", `${match.longitude}`);
+    aqiUrl.searchParams.set("current", "us_aqi");
+    aqiUrl.searchParams.set("timezone", effectiveTimezone ?? "auto");
+    const aqiData = await desktopFetchJson<AirQualityResponse>(aqiUrl.toString());
+    if (aqiData.current?.us_aqi !== undefined) {
+      aqi = Math.round(aqiData.current.us_aqi);
+      if (aqi <= 50) aqiStatus = "Good";
+      else if (aqi <= 100) aqiStatus = "Moderate";
+      else if (aqi <= 150) aqiStatus = "Unhealthy (Sensitive)";
+      else if (aqi <= 200) aqiStatus = "Unhealthy";
+      else if (aqi <= 300) aqiStatus = "Very Unhealthy";
+      else aqiStatus = "Hazardous";
+    }
+  } catch (err) {
+    console.warn("Failed to fetch AQI", err);
+  }
+
   const openMeteoSnapshot: WeatherSnapshot = {
     city: match.name,
     region: match.admin1 ? `${match.admin1}, ${match.country}` : match.country,
@@ -967,6 +965,8 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     humidity: current.relative_humidity_2m,
     windKph: current.wind_speed_10m,
     uvIndex: current.uv_index,
+    aqi,
+    aqiStatus,
     condition,
     summary: describeCondition(condition),
     updatedAt: formatUpdatedAt(current.time, effectiveTimezone),

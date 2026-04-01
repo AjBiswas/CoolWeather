@@ -1090,6 +1090,11 @@ const debounce = (fn: Function, delay: number) => {
                     <em>{getUvLabel(weather.uvIndex)}</em>
                   </div>
                   <div className="orbit-metric orbit-metric-wide">
+                    <span className="orbit-label">AQI</span>
+                    <strong>{weather.aqi !== undefined ? weather.aqi : "--"}</strong>
+                    <em>{weather.aqiStatus || "Unknown"}</em>
+                  </div>
+                  <div className="orbit-metric orbit-metric-wide">
                     <span className="orbit-label">Updated</span>
                     <strong>
                     {new Date().toLocaleTimeString([], {
