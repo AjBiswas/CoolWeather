@@ -738,7 +738,7 @@ const PANEL_WIDTH = 380;
     textAlign: "center",
     fontSize: `${layout.labelFontSize}px`,
     color: "rgba(245, 248, 255, 0.94)",
-    textShadow: "0 2px 12px rgba(10, 18, 32, 0.32)"
+    textShadow: "0 1px 3px rgba(0, 0, 0, 0.4)"
   } as CSSProperties;
 
   const statusStyle = {
@@ -748,7 +748,7 @@ const PANEL_WIDTH = 380;
     textAlign: "center",
     fontSize: `${layout.statusFontSize}px`,
     color: "rgba(238, 242, 248, 0.78)",
-    textShadow: "0 1px 10px rgba(10, 18, 32, 0.18)"
+    textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)"
   } as CSSProperties;
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
