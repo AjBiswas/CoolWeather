@@ -64,25 +64,27 @@ function displayConditionName(value: WeatherSnapshot["condition"], isNight: bool
 
   switch (value) {
     case "clear":
-      return `Clear Sky${daySuffix}`;
+      return isNight ? "Clear Night" : "Clear Sky";
     case "cloudy":
       return `Cloudy${daySuffix}`;
     case "rain":
       return `Rainy${daySuffix}`;
     case "storm":
-      return `Storm${daySuffix}`;
+      return isNight ? "Stormy Night" : "Storm";
     case "snow":
-      return `Snow${daySuffix}`;
+      return isNight ? "Snowy Night" : "Snow";
     case "mostly-sunny":
-      return `Mostly Sunny${daySuffix}`;
+      return isNight ? "Mostly Clear Night" : "Mostly Sunny";
     case "partly-cloudy":
       return `Partly Cloudy${daySuffix}`;
     case "haze":
-      return `Haze${daySuffix}`;
+      return isNight ? "Hazy Night" : "Haze";
     case "sunset":
       return "Sunset Glow";
-    default:
-      return titleCase(value) + (isNight ? " Night" : "");
+    default: {
+      const baseName = titleCase(value);
+      return (isNight ? baseName.replace(/sunny/ig, "Clear") : baseName) + daySuffix;
+    }
   }
 }
 
@@ -508,6 +510,8 @@ const PANEL_WIDTH = 380;
   const [widgetSize, setWidgetSize] = useState({ width: BASE_WIDGET_WIDTH, height: BASE_WIDGET_HEIGHT });
   const [isExpanded, setIsExpanded] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [manualQuery, setManualQuery] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -562,6 +566,7 @@ const PANEL_WIDTH = 380;
   const expandPanel = () => {
     setIsExpanded(true);
     setIsScrolled(false);
+    setIsScrolling(false);
   };
 
 // Notification panel - expand height only, no move/resize width
@@ -921,7 +926,42 @@ const debounce = (fn: Function, delay: number) => {
     return relevantDetails.filter(item => item.label?.toLowerCase().trim() !== "now");
   }, [weather.hourlyDetails]);
 
+  const handlePanelScroll = (e: React.UIEvent<HTMLElement>) => {
+    setIsScrolled(e.currentTarget.scrollTop > 0);
+    setIsScrolling(true);
+
+    if (scrollTimeoutRef.current !== null) {
+      window.clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      setIsScrolling(false);
+    }, 2000);
+  };
+
   return (
+    <>
+      <style>
+        {`
+          .detail-panel::-webkit-scrollbar,
+          .detail-overlay::-webkit-scrollbar {
+            width: 6px;
+          }
+          .detail-panel::-webkit-scrollbar-track,
+          .detail-overlay::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .detail-panel::-webkit-scrollbar-thumb,
+          .detail-overlay::-webkit-scrollbar-thumb {
+            background-color: transparent;
+            border-radius: 10px;
+          }
+          .detail-panel.is-scrolling::-webkit-scrollbar-thumb,
+          .detail-overlay.is-scrolling::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.4);
+          }
+        `}
+      </style>
     <main
         className={`poster-shell condition-${weather.condition}`}
         style={{
@@ -969,14 +1009,14 @@ const debounce = (fn: Function, delay: number) => {
 
         {isExpanded ? (
           <div
-            className="detail-overlay"
+            className={`detail-overlay ${isScrolling ? "is-scrolling" : ""}`}
             onClick={() => setIsExpanded(false)}
-            onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 0)}
+            onScroll={handlePanelScroll}
           >
 <section 
-  className="detail-panel" 
+  className={`detail-panel ${isScrolling ? "is-scrolling" : ""}`}
   onClick={(event) => event.stopPropagation()}
-  onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 0)}
+  onScroll={handlePanelScroll}
   style={{
     width: '100%',
     boxSizing: 'border-box' as CSSProperties['boxSizing'],
@@ -1240,5 +1280,6 @@ const debounce = (fn: Function, delay: number) => {
           </div>
         ) : null}
     </main>
+    </>
   );
 }
