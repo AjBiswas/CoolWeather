@@ -33,6 +33,67 @@ interface SceneTheme {
   cloudCount: number;
 }
 
+interface CloudMotion {
+  mesh: THREE.Mesh;
+  material: THREE.MeshPhysicalMaterial;
+  baseColor: THREE.Color;
+  highlightMesh: THREE.Mesh;
+  highlightMaterial: THREE.MeshBasicMaterial;
+  baseX: number;
+  baseY: number;
+  baseZ: number;
+  driftSpeed: number;
+  driftSpan: number;
+  bobAmp: number;
+  bobSpeed: number;
+  bobPhase: number;
+  swayAmp: number;
+  swaySpeed: number;
+  swayPhase: number;
+  rollAmp: number;
+  rollSpeed: number;
+  scalePulseAmp: number;
+  scalePulseSpeed: number;
+  scalePulsePhase: number;
+  highlightPhase: number;
+  initialScale: THREE.Vector3;
+}
+
+interface StarMotion {
+  mesh: THREE.Mesh;
+  material: THREE.MeshBasicMaterial;
+  baseScale: number;
+  twinkleSpeed: number;
+  twinklePhase: number;
+  pulseDepth: number;
+}
+
+interface RainMotion {
+  mesh: THREE.Mesh;
+  anchor: CloudMotion;
+  fallSpeed: number;
+  length: number;
+  lateralOffset: number;
+  depthOffset: number;
+  resetOffset: number;
+}
+
+interface BirdMotion {
+  group: THREE.Group;
+  wingLeft: THREE.Mesh;
+  wingRight: THREE.Mesh;
+  speed: number;
+  bobAmp: number;
+  bobSpeed: number;
+  phase: number;
+  wingSpeed: number;
+  wingAmp: number;
+  startX: number;
+  travel: number;
+  baseY: number;
+  baseZ: number;
+}
+
 const sceneThemes: Record<
   ThemeKey,
   SceneTheme
@@ -43,7 +104,7 @@ const sceneThemes: Record<
     orbColor: "#f2b844",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
-    orbScale: 0.9,         
+    orbScale: 1.15,         
     showGlow: true,        
     showRain: false,
     showLightning: false,
@@ -64,7 +125,7 @@ const sceneThemes: Record<
     orbColor: "#f2b844",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
-    orbScale: 0.9,         
+    orbScale: 1.15,         
     showGlow: true,        
     showRain: false,
     showLightning: false,
@@ -85,7 +146,7 @@ const sceneThemes: Record<
     orbColor: "#f2b844",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
-    orbScale: 0.9,         
+    orbScale: 1.15,         
     showGlow: true,        
     showRain: false,
     showLightning: false,
@@ -106,7 +167,7 @@ const sceneThemes: Record<
     orbColor: "#f5f7ff" ,
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
-    orbScale: 0.9,         
+    orbScale: 1.15,         
     showGlow: true,        
     showRain: false,
     showLightning: false,
@@ -202,9 +263,9 @@ const sceneThemes: Record<
     cloudColor: "#2f3e5e",
     rainColor: "#6fbfff",
 
-    orbColor: "#dfe6ff",   // moon
+    orbColor: "#e8ecf8",   // moon
     orbOpacity: 0.5,
-    orbScale: 0.6,
+    orbScale: 0.7,
     showGlow: false,
 
     showRain: true,        // ✅ important
@@ -300,7 +361,7 @@ const sceneThemes: Record<
     orbColor: "#f0f4ff",
 
     orbOpacity: 0.8,           // 🌙 more visible moon
-    orbScale: 0.9,            // bigger moon
+    orbScale: 1.15,            // bigger moon
     showGlow: true,            // subtle glow add karo
 
     backgroundColor: "#081a3a", // deeper night
@@ -322,7 +383,7 @@ const sceneThemes: Record<
 
   orbColor: "#dcdee5",
   orbOpacity: 0.7,
-  orbScale: 0.6,
+  orbScale: 0.7,
   showGlow: false,
 
   showRain: false,
@@ -354,6 +415,8 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
 
   const material = new THREE.MeshPhysicalMaterial({
     color: variedColor,
+    emissive: variedColor.clone(),
+    emissiveIntensity: 0,
     roughness: 0.9,
     metalness: 0,
     transmission: 0,
@@ -377,9 +440,14 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
   );
 
   group.add(puff);
+  return { puff, material, baseColor: variedColor.clone() };
 }
+
+
 export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+
+
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -405,7 +473,28 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       themeKey = condition;   // ✅ THIS WAS MISSING
     }
 
-    const theme = sceneThemes[themeKey];
+    const baseTheme = sceneThemes[themeKey];
+    const isHiddenOrbScene =
+      themeKey === "cloudy" ||
+      themeKey === "cloudy-night" ||
+      (isNight && (themeKey === "rainy-night" || themeKey === "storm"));
+    const theme = {
+      ...baseTheme,
+      showGlow: isHiddenOrbScene ? false : true,
+      orbScale: isHiddenOrbScene
+        ? 0
+        : isNight
+        ? Math.max(baseTheme.orbScale, 1.05)
+        : Math.max(baseTheme.orbScale, 0.95),
+      orbOpacity: isHiddenOrbScene
+        ? 0
+        : isNight
+        ? 1
+        : 1,
+      emissiveIntensity: isHiddenOrbScene
+        ? 0
+        : Math.max((baseTheme as any).emissiveIntensity ?? 1.4, isNight ? 1.9 : 1.6)
+    };
     const width = mount.clientWidth;
     const height = mount.clientHeight;
 
@@ -447,6 +536,20 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     scene.add(bounce);
 
     const cloud = new THREE.Group();
+    const cloudMotions: CloudMotion[] = [];
+    const isDenseCloudScene = theme.cloudCount >= 8;
+    const isRainScene = theme.showRain;
+    const isClearBirdScene = !isNight && (condition === "clear" || condition === "mostly-sunny");
+    const cloudVerticalOffset =
+      themeKey === "cloudy" ||
+      themeKey === "cloudy-night" ||
+      themeKey === "rain" ||
+      themeKey === "rainy-night" ||
+      themeKey === "storm"
+        ? 0.6
+        : 0;
+    const orbHighlightColor = new THREE.Color(theme.orbColor);
+
     const baseCloudPositions = [
       [-1.4, 0.95, 0.1, 0.9],
       [-0.7, 1.18, 0.15, 1.02],
@@ -459,11 +562,17 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
 
     for (let i = 0; i < theme.cloudCount; i += 1) {
     const index = i % baseCloudPositions.length;
-    let [x, y, z, scale] = baseCloudPositions[index];
+    const [x, y, z, scale] = baseCloudPositions[index];
 
     const jitterX = x + (Math.random() - 0.5) * 0.18;
-    const jitterY = y - 0.2 + (Math.random() - 0.5) * 0.12;
-    const jitterScale = scale * (0.85 + Math.random() * 0.2);
+      const jitterY = y - 0.34 + cloudVerticalOffset + (Math.random() - 0.5) * 0.12;
+    const jitterScale = scale * (
+      isDenseCloudScene
+        ? 1.18 + Math.random() * 0.34
+        : isRainScene
+        ? 1.05 + Math.random() * 0.28
+        : 0.85 + Math.random() * 0.2
+    );
 
     // 🔥 MAGIC: half clouds back, half front
     const isFront = i % 2 === 0;
@@ -471,30 +580,79 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     // 🔥 shift front clouds sideways (moon cover na kare)
     const offsetX = isFront ? (Math.random() > 0.5 ? 0.6 : -0.6) : 0;
 
-    const finalZ = isFront ? 0.3 : -0.4;
+      const initialX = jitterX + offsetX;
+      const finalZ = isNight
+        ? 0.04 + Math.random() * 0.26
+        : (isFront ? 0.3 : -0.4) + (Math.random() - 0.5) * 0.18;
 
-    addCloudPuff(
+    const { puff, material, baseColor } = addCloudPuff(
       cloud,
       theme.cloudColor,
-      jitterX + offsetX,
+      initialX,
       jitterY,
       finalZ,
       jitterScale,
       theme.cloudOpacity
     );
+
+    const highlightMaterial = new THREE.MeshBasicMaterial({
+      color: orbHighlightColor,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const highlightMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 20, 20),
+      highlightMaterial
+    );
+    highlightMesh.scale.set(
+      puff.scale.x * 0.42,
+      puff.scale.y * 0.34,
+      puff.scale.z * 0.3
+    );
+    puff.add(highlightMesh);
+
+    cloudMotions.push({
+      mesh: puff,
+      material,
+      baseColor,
+      highlightMesh,
+      highlightMaterial,
+      baseX: initialX,
+      baseY: jitterY,
+      baseZ: finalZ,
+      driftSpeed: isDenseCloudScene ? 0.004 + Math.random() * 0.008 : 0.035 + Math.random() * 0.04 + (isFront ? 0.015 : 0),
+      driftSpan: isDenseCloudScene ? 0.45 + Math.random() * 0.5 : 5.8 + Math.random() * 1.8,
+      bobAmp: isDenseCloudScene ? 0.008 + Math.random() * 0.012 : 0.018 + Math.random() * 0.03,
+      bobSpeed: isDenseCloudScene ? 0.12 + Math.random() * 0.12 : 0.28 + Math.random() * 0.32,
+      bobPhase: Math.random() * Math.PI * 2,
+      swayAmp: isDenseCloudScene ? 0.015 + Math.random() * 0.025 : 0.08 + Math.random() * 0.12 + (isFront ? 0.04 : 0),
+      swaySpeed: isDenseCloudScene ? 0.08 + Math.random() * 0.08 : 0.16 + Math.random() * 0.2,
+      swayPhase: Math.random() * Math.PI * 2,
+      rollAmp: isDenseCloudScene ? 0.004 + Math.random() * 0.01 : 0.02 + Math.random() * 0.03,
+      rollSpeed: isDenseCloudScene ? 0.05 + Math.random() * 0.06 : 0.14 + Math.random() * 0.12,
+      scalePulseAmp: isDenseCloudScene ? 0.04 + Math.random() * 0.03 : 0.018 + Math.random() * 0.018,
+      scalePulseSpeed: isDenseCloudScene ? 0.09 + Math.random() * 0.08 : 0.18 + Math.random() * 0.14,
+      scalePulsePhase: Math.random() * Math.PI * 2,
+      highlightPhase: Math.random() * Math.PI * 2,
+      initialScale: puff.scale.clone()
+    });
+
   }
+
 
     const underShadow = new THREE.Mesh(
       new THREE.SphereGeometry(1.6, 32, 32),
       new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.22 * theme.cloudOpacity })
     );
-    underShadow.position.set(0.2, 0.15, -0.6);
-    underShadow.scale.set(1.4, 0.25, 0.9);
+    underShadow.position.set(0.08, -1.75, -0.9);
+    underShadow.scale.set(1.55, 0.29, 0.9);
     cloud.add(underShadow);
     scene.add(cloud);
 
-    const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(theme.orbScale, 48, 48),
+    const orb = !isHiddenOrbScene ? new THREE.Mesh(
+    new THREE.CircleGeometry(theme.orbScale, 48),
     new THREE.MeshStandardMaterial({
       color: new THREE.Color(theme.orbColor),
       emissive: new THREE.Color(theme.orbColor),
@@ -504,63 +662,174 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       transparent: true,
       opacity: theme.orbOpacity
     })
-    );
-      orb.position.set(0, 1.35, -0.2);
-    scene.add(orb);
+    ) : null;
+    if (orb) {
+      orb.position.set(0, 1.56, -0.9);
+      scene.add(orb);
+    }
 
-    if (theme.showGlow) {
-      const glowGeometry = new THREE.SphereGeometry(theme.orbScale * 1.3, 32, 32);
+    if (theme.showGlow && orb) {
+      const glowGeometry = new THREE.CircleGeometry(theme.orbScale * 1.12, 48);
       const glowMaterial = new THREE.MeshBasicMaterial({
       color: theme.orbColor,   // ✅ same as sun/moon
       transparent: true,
-      opacity: 0.15,           // thoda increase for nice glow
+      opacity: 0.11,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
       depthWrite: false
       });
       const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-      glowMesh.position.set(0, 1.35, -0.2);
+      glowMesh.position.set(0, 1.38, -1.05);
+      glowMesh.scale.set(1, 1.08, 1);
+      glowMesh.renderOrder = -1;
       scene.add(glowMesh);
     }
 
     const starGroup = new THREE.Group();
+    const starMotions: StarMotion[] = [];
     if (theme.showStars) {
       for (let index = 0; index < 7; index += 1) {
+        const starMaterial = new THREE.MeshBasicMaterial({
+          color: theme.orbColor === "#f7f9ff" ? "#ffe" : "#ffd76a",
+          transparent: true,
+          opacity: 0.7 + Math.random() * 0.25
+        });
+        const baseScale = 0.04 + Math.random() * 0.018;
         const star = new THREE.Mesh(
-          new THREE.SphereGeometry(0.04 + Math.random() * 0.018, 12, 12),
-          new THREE.MeshBasicMaterial({ color: theme.orbColor === "#f7f9ff" ? "#ffe" : "#ffd76a" })
+          new THREE.SphereGeometry(baseScale, 12, 12),
+          starMaterial
         );
         const spreadX = -2 + Math.random() * 4;
         const spreadY = 1.2 + Math.random() * 1.4; // bigger vertical spread
 
-        star.position.set(spreadX, spreadY, -0.3);
+        star.position.set(spreadX, spreadY, -2.1);
+        star.renderOrder = -5;
         starGroup.add(star);
+        starMotions.push({
+          mesh: star,
+          material: starMaterial,
+          baseScale,
+          twinkleSpeed: 0.7 + Math.random() * 1.6,
+          twinklePhase: Math.random() * Math.PI * 2,
+          pulseDepth: 0.18 + Math.random() * 0.2
+        });
       }
     }
+    starGroup.renderOrder = -5;
     scene.add(starGroup);
 
     const rainGroup = new THREE.Group();
+    const rainMotions: RainMotion[] = [];
     if (theme.showRain) {
-      for (let index = 0; index < 14; index += 1) {
+      for (let index = 0; index < 18; index += 1) {
+        const anchor = cloudMotions[index % Math.max(cloudMotions.length, 1)];
+        const length = 0.38 + Math.random() * 0.24;
         const drop = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, 0.56 + Math.random() * 0.28, 0.02),
+          new THREE.BoxGeometry(0.05, length, 0.02),
           new THREE.MeshBasicMaterial({ color: theme.rainColor })
         );
         drop.position.set((Math.random() - 0.5) * 4.2, 1.1 + Math.random() * 2.1, (Math.random() - 0.5) * 0.6);
         drop.rotation.z = 0.16;
         rainGroup.add(drop);
+        if (anchor) {
+          rainMotions.push({
+            mesh: drop,
+            anchor,
+            fallSpeed: 0.1 + Math.random() * 0.045,
+            length,
+            lateralOffset: (Math.random() - 0.5) * Math.max(0.4, anchor.initialScale.x * 0.55),
+            depthOffset: (Math.random() - 0.5) * 0.16,
+            resetOffset: Math.random() * 1.4
+          });
+        }
       }
     }
     scene.add(rainGroup);
 
+    const birdGroup = new THREE.Group();
+    const birdMotions: BirdMotion[] = [];
+    if (isClearBirdScene) {
+      for (let index = 0; index < 5; index += 1) {
+        const bird = new THREE.Group();
+        const wingMaterial = new THREE.MeshBasicMaterial({
+          color: "#1a2233",
+          transparent: true,
+          opacity: 0.82
+        });
+        const wingGeometry = new THREE.BoxGeometry(0.16, 0.018, 0.01);
+        const wingLeft = new THREE.Mesh(wingGeometry, wingMaterial);
+        const wingRight = new THREE.Mesh(wingGeometry, wingMaterial.clone());
+        wingLeft.position.set(-0.08, 0, 0);
+        wingRight.position.set(0.08, 0, 0);
+        bird.add(wingLeft);
+        bird.add(wingRight);
+        bird.position.set(-3.8 - index * 0.55, 1.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.18);
+        bird.scale.setScalar(0.9 - index * 0.08);
+        birdGroup.add(bird);
+        birdMotions.push({
+          group: bird,
+          wingLeft,
+          wingRight,
+          speed: 0.16 + Math.random() * 0.05,
+          bobAmp: 0.03 + Math.random() * 0.02,
+          bobSpeed: 0.9 + Math.random() * 0.45,
+          phase: Math.random() * Math.PI * 2,
+          wingSpeed: 8 + Math.random() * 4,
+          wingAmp: 0.72 + Math.random() * 0.18,
+          startX: bird.position.x,
+          travel: 8.4 + Math.random() * 1.4,
+          baseY: bird.position.y,
+          baseZ: bird.position.z
+        });
+      }
+    }
+    scene.add(birdGroup);
+
     const lightning = new THREE.Group();
-    const lightningMat = new THREE.MeshBasicMaterial({ color: "#8f1d1d", transparent: true, opacity: 0 });
-    const l1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.02), lightningMat);
-    l1.position.set(0.42, 1.2, 0.3);
-    l1.rotation.z = 0.62;
+    const lightningMat = new THREE.MeshBasicMaterial({
+      color: "#f7f3d6",
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending
+    });
+    const lightningGlowMat = new THREE.MeshBasicMaterial({
+      color: "#8fc8ff",
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const l1Glow = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.9, 0.03), lightningGlowMat);
+    l1Glow.position.set(0.44, 1.18, 0.8);
+    l1Glow.rotation.z = 0.6;
+    l1Glow.renderOrder = 6;
+    lightning.add(l1Glow);
+    const l1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.86, 0.02), lightningMat);
+    l1.position.set(0.44, 1.18, 0.82);
+    l1.rotation.z = 0.6;
+    l1.renderOrder = 7;
     lightning.add(l1);
-    const l2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.56, 0.02), lightningMat);
-    l2.position.set(0.62, 0.86, 0.3);
-    l2.rotation.z = -0.68;
+    const l2Glow = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, 0.03), lightningGlowMat);
+    l2Glow.position.set(0.66, 0.82, 0.8);
+    l2Glow.rotation.z = -0.7;
+    l2Glow.renderOrder = 6;
+    lightning.add(l2Glow);
+    const l2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.58, 0.02), lightningMat);
+    l2.position.set(0.66, 0.82, 0.82);
+    l2.rotation.z = -0.7;
+    l2.renderOrder = 7;
     lightning.add(l2);
+    const l3Glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.34, 0.03), lightningGlowMat);
+    l3Glow.position.set(0.53, 0.55, 0.8);
+    l3Glow.rotation.z = 0.38;
+    l3Glow.renderOrder = 6;
+    lightning.add(l3Glow);
+    const l3 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.02), lightningMat);
+    l3.position.set(0.53, 0.55, 0.82);
+    l3.rotation.z = 0.38;
+    l3.renderOrder = 7;
+    lightning.add(l3);
+    lightning.renderOrder = 6;
     scene.add(lightning);
 
     const clock = new THREE.Clock();
@@ -574,35 +843,97 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
 
-      cloud.position.y = Math.sin(elapsed * 0.85) * 0.015;
-      orb.position.y = 1.08 + Math.sin(elapsed * 1.4) * 0.025;
+      cloud.position.x = isDenseCloudScene ? Math.sin(elapsed * 0.04) * 0.012 : Math.sin(elapsed * 0.08) * 0.05;
+      cloud.position.y = isDenseCloudScene ? Math.sin(elapsed * 0.08) * 0.01 : Math.sin(elapsed * 0.22) * 0.025;
+      cloud.rotation.z = isDenseCloudScene ? Math.sin(elapsed * 0.05) * 0.004 : Math.sin(elapsed * 0.11) * 0.015;
 
-      rainGroup.children.forEach((drop, index) => {
-        drop.position.y -= 0.1 + (index % 3) * 0.01;
-        if (drop.position.y < -1.6) {
-          drop.position.y = 3.2;
-        }
+      if (orb) {
+        orb.position.y = 1.08 + Math.sin(elapsed * 1.4) * 0.025;
+      }
+
+      cloudMotions.forEach((cloudMotion, index) => {
+        const rawDrift = ((elapsed * cloudMotion.driftSpeed) + index * 0.73) % cloudMotion.driftSpan;
+        const wrappedX = isDenseCloudScene
+          ? cloudMotion.baseX + Math.sin(elapsed * cloudMotion.driftSpeed * 4 + index) * cloudMotion.driftSpan
+          : cloudMotion.baseX - cloudMotion.driftSpan / 2 + rawDrift;
+        const horizontalSway = Math.sin(elapsed * cloudMotion.swaySpeed + cloudMotion.swayPhase) * cloudMotion.swayAmp;
+        const verticalBob = Math.sin(elapsed * cloudMotion.bobSpeed + cloudMotion.bobPhase) * cloudMotion.bobAmp;
+        const depthSway = Math.cos(elapsed * (cloudMotion.swaySpeed * 0.7) + cloudMotion.swayPhase) * (isDenseCloudScene ? cloudMotion.swayAmp * 0.12 : cloudMotion.swayAmp * 0.35);
+        const scalePulse = 1 + Math.sin(elapsed * cloudMotion.scalePulseSpeed + cloudMotion.scalePulsePhase) * cloudMotion.scalePulseAmp;
+        const nextX = wrappedX + horizontalSway;
+        const nextY = cloudMotion.baseY + verticalBob;
+        const nextZ = cloudMotion.baseZ + depthSway;
+        cloudMotion.mesh.position.x = nextX;
+        cloudMotion.mesh.position.y = nextY;
+        cloudMotion.mesh.position.z = nextZ;
+        cloudMotion.mesh.rotation.z = Math.sin(elapsed * cloudMotion.rollSpeed + cloudMotion.bobPhase) * cloudMotion.rollAmp;
+        cloudMotion.mesh.rotation.y = Math.cos(elapsed * (cloudMotion.rollSpeed * 0.8) + cloudMotion.swayPhase) * (cloudMotion.rollAmp * 2.2);
+        cloudMotion.material.color.copy(cloudMotion.baseColor);
+        cloudMotion.material.emissive.copy(cloudMotion.baseColor);
+        cloudMotion.material.emissiveIntensity = 0;
+        cloudMotion.highlightMesh.position.set(0, 0, 0);
+        cloudMotion.highlightMaterial.color.copy(orbHighlightColor);
+        cloudMotion.highlightMaterial.opacity = 0;
+        cloudMotion.mesh.scale.set(
+          cloudMotion.initialScale.x * scalePulse,
+          cloudMotion.initialScale.y * (1 + Math.cos(elapsed * cloudMotion.scalePulseSpeed + cloudMotion.scalePulsePhase) * (cloudMotion.scalePulseAmp * (isDenseCloudScene ? 1.05 : 0.7))),
+          cloudMotion.initialScale.z * (1 + Math.sin(elapsed * (cloudMotion.scalePulseSpeed * 0.85) + cloudMotion.scalePulsePhase) * (cloudMotion.scalePulseAmp * (isDenseCloudScene ? 0.85 : 0.55)))
+        );
+      });
+
+      starMotions.forEach((starMotion, index) => {
+        const shimmer = 0.72 + Math.sin(elapsed * starMotion.twinkleSpeed + starMotion.twinklePhase) * starMotion.pulseDepth;
+        const microFlicker = 0.94 + Math.sin(elapsed * (starMotion.twinkleSpeed * 2.3) + index) * 0.06;
+        const twinkle = shimmer * microFlicker;
+        starMotion.material.opacity = Math.max(0.18, Math.min(1, twinkle));
+        const scale = starMotion.baseScale * (0.92 + twinkle * 0.28);
+        starMotion.mesh.scale.setScalar(scale / starMotion.baseScale);
+      });
+
+      rainMotions.forEach((rainMotion, index) => {
+        const anchorScaleY = rainMotion.anchor.mesh.scale.y;
+        const sourceX = cloud.position.x + rainMotion.anchor.mesh.position.x + rainMotion.lateralOffset;
+        const sourceY = cloud.position.y + rainMotion.anchor.mesh.position.y - anchorScaleY * 0.42;
+        const sourceZ = cloud.position.z + rainMotion.anchor.mesh.position.z + rainMotion.depthOffset;
+        const fallCycle = (elapsed * rainMotion.fallSpeed * 3 + rainMotion.resetOffset + index * 0.17) % 2.9;
+
+        rainMotion.mesh.position.x = sourceX;
+        rainMotion.mesh.position.y = sourceY - fallCycle;
+        rainMotion.mesh.position.z = sourceZ;
+        rainMotion.mesh.scale.y = 0.95 + Math.sin(elapsed * 2.2 + index) * 0.08;
+      });
+
+      birdMotions.forEach((birdMotion, index) => {
+        const travel = ((elapsed * birdMotion.speed) + index * 0.43) % birdMotion.travel;
+        birdMotion.group.position.x = birdMotion.startX + travel;
+        birdMotion.group.position.y = birdMotion.baseY + Math.sin(elapsed * birdMotion.bobSpeed + birdMotion.phase) * birdMotion.bobAmp;
+        birdMotion.group.position.z = birdMotion.baseZ + Math.cos(elapsed * 0.6 + birdMotion.phase) * 0.03;
+        const flap = Math.sin(elapsed * birdMotion.wingSpeed + birdMotion.phase) * birdMotion.wingAmp;
+        birdMotion.wingLeft.rotation.z = -0.3 - flap;
+        birdMotion.wingRight.rotation.z = 0.3 + flap;
       });
 
       if (theme.showLightning) {
         lightningTimer -= delta;
 
         if (lightningTimer <= 0) {
-          if (Math.random() > 0.96) {
+          if (Math.random() > 0.9) {
             isFlashing = true;
-            lightningTimer = 0.12;
+            lightningTimer = 0.16;
           } else {
             isFlashing = false;
-            lightningTimer = 1 + Math.random() * 2;
+            lightningTimer = 0.65 + Math.random() * 1.35;
           }
         }
 
         // 🔥 smooth lightning fade
         if (isFlashing) {
-          lightningMat.opacity = Math.min(1, lightningMat.opacity + 0.25);
+          lightningMat.opacity = Math.min(1, lightningMat.opacity + 0.4);
+          lightningGlowMat.opacity = Math.min(0.55, lightningGlowMat.opacity + 0.22);
           scene.background = flashColor;
         } else {
           lightningMat.opacity *= 0.85;
+          lightningGlowMat.opacity *= 0.78;
           scene.background = null;
         }
       }
@@ -610,6 +941,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       renderer.render(scene, camera);
       frameId = window.requestAnimationFrame(animate);
     };
+
     animate();
 
     const onResize = () => {
@@ -642,5 +974,3 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
 
   return <div className="weather-scene" ref={mountRef} aria-hidden="true" />;
 }
-
-

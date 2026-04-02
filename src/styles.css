@@ -41,8 +41,8 @@ body,
 .poster-widget {
   -webkit-app-region: drag;
   position: relative;
-  width: 320px;
-  height: 250px;
+  width: 290px;
+  height: 240px;
   overflow: hidden;
   border-radius: 24px;
   box-shadow: none;
@@ -111,7 +111,7 @@ body,
 }
 
 .poster-number-front {
-  transform: scaleY(1.18);
+  transform: scaleY(1.24);
   color: transparent;
 }
 
@@ -171,6 +171,12 @@ body,
   backdrop-filter: none;
 
   z-index: 100;
+}
+
+.detail-overlay,
+.detail-panel,
+.detail-panel * {
+  -webkit-app-region: no-drag;
 }
 
 .detail-panel {

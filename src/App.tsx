@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type FormEvent } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+
 import { WeatherScene } from "./components/WeatherScene";
 import { fallbackWeather } from "./data/mockWeather";
 import {
@@ -10,9 +13,11 @@ import {
 } from "./lib/liveWeather";
 import type { WeatherSnapshot, LocationSuggestion } from "./types";
 
+gsap.registerPlugin(useGSAP);
 
-const BASE_WIDGET_WIDTH = 320;
-const BASE_WIDGET_HEIGHT = 250;
+
+const BASE_WIDGET_WIDTH = 290;
+const BASE_WIDGET_HEIGHT = 240;
 const zeroWeather: WeatherSnapshot = {
   ...fallbackWeather,
   city: "Location unavailable",
@@ -478,7 +483,7 @@ export default function App() {
   const [status, setStatus] = useState("Loading location...");
   const [appError, setAppError] = useState<string | null>(null);
 const PANEL_WIDTH = 380;
-  const BASE_WIDTH = 320;
+  const BASE_WIDTH = 300;
   // TOTAL_WIDTH = BASE_WIDTH + PANEL_WIDTH; // DISABLED - no extra window resize
 
   useEffect(() => {
@@ -522,6 +527,7 @@ const PANEL_WIDTH = 380;
   const [openMeteoServiceLoading, setOpenMeteoServiceLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expandAnchorY, setExpandAnchorY] = useState<"top" | "bottom">("top");
 
   const OPEN_METEO_SERVICES = [
     { id: "seasonal-forecast", label: "Seasonal Forecast" },
@@ -536,7 +542,55 @@ const PANEL_WIDTH = 380;
 
   const widgetRef = useRef<HTMLElement | null>(null);
 
+  useGSAP(() => {
+    
+    const numTl = gsap.timeline({ repeat: -1, repeatDelay: 4.2 });
+
+    gsap.set('.poster-number-wrap', { transformPerspective: 800, transformStyle: "preserve-3d", transformOrigin: "center" });
+
+    numTl.to('.poster-number-wrap', {
+      rotationY: -8,
+      duration: 0.95,
+      ease: "sine.inOut"
+    }).to('.poster-number-wrap', {
+      rotationY: 0,
+      duration: 1.1,
+      ease: "sine.inOut"
+    }).to('.poster-number-wrap', {
+      rotationY: 8,
+      duration: 0.95,
+      ease: "sine.inOut"
+    }).to('.poster-number-wrap', {
+      rotationY: 0,
+      duration: 1.1,
+      ease: "sine.inOut"
+    });
+
+    // Flow clouds smoothly across the sky from right to left, fading at the edges
+    // This creates a majestic, seamless continuous float across the sun/moon
+    const cloudTl = gsap.timeline({ repeat: -1 });
+    cloudTl.fromTo('.poster-scene [class*="cloud"], .poster-scene [class*="Cloud"]',
+      { x: 120, opacity: 0 },
+      { x: 60, opacity: 1, duration: 6, ease: "none" }
+    ).to('.poster-scene [class*="cloud"], .poster-scene [class*="Cloud"]',
+      { x: -60, opacity: 1, duration: 12, ease: "none" }
+    ).to('.poster-scene [class*="cloud"], .poster-scene [class*="Cloud"]',
+      { x: -120, opacity: 0, duration: 6, ease: "none" }
+    );
+
+    gsap.to('.poster-scene [class*="sun"], .poster-scene [class*="Sun"], .poster-scene [class*="moon"], .poster-scene [class*="Moon"]', {
+      y: -4,
+      scale: 1.02,
+      duration: 4,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+      transformOrigin: "center"
+    });
+  }, { scope: widgetRef, dependencies: [weather.condition, weather.isNight] });
+
   useEffect(() => {
+   
     const element = widgetRef.current;
     if (!element) {
       return;
@@ -546,7 +600,7 @@ const PANEL_WIDTH = 380;
       const { width, height } = element.getBoundingClientRect();
       setWidgetSize({
         width: Math.max(280, Math.round(width)),
-        height: Math.max(250, Math.round(height))
+        height: Math.max(240, Math.round(height))
       });
     };
 
@@ -571,11 +625,31 @@ const PANEL_WIDTH = 380;
 
 // Notification panel - expand height only, no move/resize width
     useEffect(() => {
-      if (isExpanded) {
-        window.resizeTo(320, 600);
-      } else {
-        window.resizeTo(320, 250);
-      }
+      let cancelled = false;
+
+      const syncWindowSize = async () => {
+        try {
+          const result = await window.coolWeatherDesktop?.setWidgetSize?.(isExpanded ? "large" : "small");
+          if (!cancelled && result?.anchorY) {
+            setExpandAnchorY(result.anchorY);
+          }
+        } catch {
+          if (!cancelled) {
+            if (isExpanded) {
+              window.resizeTo(290, 580);
+            } else {
+              window.resizeTo(290, 240);
+            }
+            setExpandAnchorY("top");
+          }
+        }
+      };
+
+      void syncWindowSize();
+
+      return () => {
+        cancelled = true;
+      };
     }, [isExpanded]);
   useEffect(() => {
     let active = true;
@@ -658,7 +732,7 @@ const PANEL_WIDTH = 380;
     const sceneScale = Math.min(widthRatio, heightRatio, 1);
     const numberFontSize = Math.round(Math.min(widgetSize.width * 0.28, widgetSize.height * 0.37));
     const numberWidth = Math.round(numberFontSize * 1.42);
-    const numberHeight = Math.round(numberFontSize * 1.28);
+    const numberHeight = Math.round(numberFontSize * 1.34);
     const numberTop = Math.round(widgetSize.height * 0.34);
     const labelTop = numberTop + numberHeight - Math.max(24, Math.round(widgetSize.height * 0.06));
     const statusTop = labelTop + Math.max(20, Math.round(widgetSize.height * 0.055));
@@ -701,17 +775,17 @@ const PANEL_WIDTH = 380;
   } as CSSProperties;
 
   const numberBackStyle = {
-    transform: `translate(${layout.depthBack}px, ${layout.depthBack}px) scaleY(1.18)`,
+    transform: `translate(${layout.depthBack}px, ${layout.depthBack}px) scaleY(1.24)`,
     color: "rgba(0, 0, 0, 0.12)"
   } as CSSProperties;
 
   const numberSideStyle = {
-    transform: `translate(${layout.depthSide}px, ${layout.depthSide}px) scaleY(1.18)`,
+    transform: `translate(${layout.depthSide}px, ${layout.depthSide}px) scaleY(1.24)`,
     color: "rgba(0, 0, 0, 0.35)",
     textShadow: `0 4px 12px rgba(0,0,0,0.2)`
   } as CSSProperties;
 
- const numberFrontStyle = {
+  const numberFrontStyle = {
   ...numberTextStyle,
   color: usesDarkNumber ? "#111827" : "#ffffff",
   textShadow: usesDarkNumber
@@ -750,6 +824,15 @@ const PANEL_WIDTH = 380;
     color: "rgba(238, 242, 248, 0.78)",
     textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)"
   } as CSSProperties;
+
+  const widgetAnchorStyle = isExpanded && expandAnchorY === "bottom"
+    ? ({
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0
+      } as CSSProperties)
+    : undefined;
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -815,7 +898,7 @@ const PANEL_WIDTH = 380;
   };
 
 const debounce = (fn: Function, delay: number) => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     return (...args: any[]) => {
       clearTimeout(timer);
       timer = setTimeout(() => fn(...args), delay);
@@ -884,46 +967,9 @@ const debounce = (fn: Function, delay: number) => {
       return [];
     }
 
-        const currentHour = new Date().getHours();
-        let startIndex = 0;
-        let prevHour = -1;
-
-    // The API provides data for the whole day. Find the index of the current or next hour
-        // to start the forecast from the present time by parsing the label.
-        for (let i = 0; i < weather.hourlyDetails.length; i++) {
-          const label = weather.hourlyDetails[i].label?.toLowerCase().trim() || "";
-          if (label === "now") {
-            startIndex = i;
-            break;
-          }
-
-          let hour = -1;
-          const ampmMatch = label.match(/^(\d{1,2})\s*(am|pm)$/);
-          if (ampmMatch) {
-            hour = parseInt(ampmMatch[1], 10);
-            const isPm = ampmMatch[2] === "pm";
-            if (hour === 12) hour = isPm ? 12 : 0;
-            else if (isPm) hour += 12;
-          } else {
-            const timeMatch = label.match(/^(\d{1,2}):\d{2}$/);
-            if (timeMatch) hour = parseInt(timeMatch[1], 10);
-            else {
-              const hourMatch = label.match(/^(\d{1,2})$/);
-              if (hourMatch) hour = parseInt(hourMatch[1], 10);
-            }
-          }
-
-          if (hour !== -1) {
-            if (hour >= currentHour || (prevHour !== -1 && hour < prevHour)) {
-              startIndex = i;
-              break;
-            }
-            prevHour = hour;
-          }
-        }
-
-        const relevantDetails = weather.hourlyDetails.slice(startIndex);
-    return relevantDetails.filter(item => item.label?.toLowerCase().trim() !== "now");
+    return weather.hourlyDetails
+      .filter((item) => item.label?.toLowerCase().trim() !== "now")
+      .slice(0, 5);
   }, [weather.hourlyDetails]);
 
   const handlePanelScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -966,12 +1012,12 @@ const debounce = (fn: Function, delay: number) => {
         className={`poster-shell condition-${weather.condition}`}
         style={{
           position: "relative",
-          width: "320px",  // Fixed widget width - notification style overlay
-          height: isExpanded ? "600px" : "250px",
+          width: "290px",  // Fixed widget width - notification style overlay
+          height: isExpanded ? "580px" : "240px",
           overflow: "hidden"
         }}
       >
-      <section className="poster-widget" ref={widgetRef}>
+      <section className="poster-widget" ref={widgetRef} style={widgetAnchorStyle}>
         <div className="poster-frame poster-scene-frame" style={sceneFrameStyle}>
           <div className="poster-scene">
             <WeatherScene condition={weather.condition} temperature={weather.temperatureC} isNight={Boolean(weather.isNight)} />

@@ -14,5 +14,5 @@ contextBridge.exposeInMainWorld("coolWeatherDesktop", {
   platform: process.platform,
   fetchJson: (url: string) => fetchRemote(url, "json"),
   fetchText: (url: string) => fetchRemote(url, "text"),
-  setWidgetSize: (mode: "small" | "large" | "toggle") => ipcRenderer.invoke("widget:set-size", mode)
+  setWidgetSize: (mode: "small" | "large" | "toggle") => ipcRenderer.invoke("widget:set-size", mode) as Promise<{ anchorY: "top" | "bottom" }>
 });

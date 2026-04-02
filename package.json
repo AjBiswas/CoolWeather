@@ -18,16 +18,23 @@
   "build": {
     "appId": "com.coolweather.desktop",
     "productName": "CoolWeather",
+    "directories": {
+      "buildResources": "build"
+    },
     "files": [
       "dist",
+      "assets",
       "package.json"
     ],
     "win": {
       "target": "dir",
-      "signAndEditExecutable": false
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
     }
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "gsap": "^3.14.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.177.0"
