@@ -491,7 +491,7 @@ function getMoonTimes(date: Date, lat: number, lng: number) {
   let prev = moonPosition(start, lat, lng);
   let prevAlt = prev.altitude - hc;
   // A lunar day is ~24h 50m, so we might miss an event in a 24h window.
-  // Let's check over a 36-hour period to be sure to find the next rise and set.
+  // Check a 36-hour period to improve the chance of finding the next rise and set.
   // A 36-hour window may not be enough if the next rise is near the end of
   // the window. A 50-hour window should be sufficient to find the next rise and set.
   for (let hour = 1; hour <= 50; hour++) {

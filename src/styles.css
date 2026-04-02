@@ -353,7 +353,7 @@ body,
 }
 
 .temp-unit {
-  color: #f5010c; /* OnePlus signature red */
+  color: #f5010c; /* Accent color for the temperature unit. */
 }
 
 .detail-temp-separator {
@@ -438,11 +438,11 @@ body,
   background: rgba(255, 255, 255, 0.35);
 }
 .forecast-left {
-  display: contents;   /* 👈 important */
+  display: contents;   /* Preserve the grid layout without adding a wrapper box. */
 }
 
 .forecast-right {
-  display: contents;   /* 👈 important */
+  display: contents;   /* Preserve the grid layout without adding a wrapper box. */
 }
 .forecast-pill {
   display: grid;
@@ -1018,11 +1018,11 @@ body,
   transform: scale(0.98);
 }
 
-/* Premium iPhone-style word hover glassmorphism */
+/* Word-level hover treatment for highlighted text. */
 .premium-hover-word {
   position: relative;
-  display: inline-block; /* Key for word-level */
-  cursor: default; /* Natural pointer on hover */
+  display: inline-block; /* Required for per-word hover effects. */
+  cursor: default; /* Keep the cursor neutral for non-interactive text. */
   padding: 0.1em 0.2em;
   border-radius: 6px;
   overflow: hidden;
@@ -1060,7 +1060,7 @@ body,
   transform: scale(1.05);
 }
 
-/* Apply to all key text spans/small/strong for "every word" */
+/* Apply the hover treatment to key inline text elements. */
 .orbit-label,
 .forecast-time,
 .forecast-temp,

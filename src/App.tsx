@@ -243,7 +243,7 @@ function renderSeasonalData(data: unknown, cityName: string): JSX.Element {
       const precip = daily.precipitation_sum as number[];
 
       if (Array.isArray(times)) {
-        // Group 180 days of forecasts into clean monthly averages
+        // Aggregate the 180-day forecast into monthly averages.
         const monthlyData: Record<string, { max: number[], min: number[], precip: number[] }> = {};
         times.forEach((time, index) => {
           if (typeof time !== "string") return;
@@ -256,7 +256,7 @@ function renderSeasonalData(data: unknown, cityName: string): JSX.Element {
           if (precip && typeof precip[index] === "number") monthlyData[month].precip.push(precip[index]);
         });
 
-        const months = Object.keys(monthlyData).slice(0, 6); // Display the next 6 months
+        const months = Object.keys(monthlyData).slice(0, 6); // Show the next six months.
 
         return (
           <div className="open-meteo-service-data">
@@ -566,8 +566,7 @@ const PANEL_WIDTH = 380;
       ease: "sine.inOut"
     });
 
-    // Flow clouds smoothly across the sky from right to left, fading at the edges
-    // This creates a majestic, seamless continuous float across the sun/moon
+    // Animate the cloud layer from right to left with soft edge fades.
     const cloudTl = gsap.timeline({ repeat: -1 });
     cloudTl.fromTo('.poster-scene [class*="cloud"], .poster-scene [class*="Cloud"]',
       { x: 120, opacity: 0 },
@@ -623,7 +622,7 @@ const PANEL_WIDTH = 380;
     setIsScrolling(false);
   };
 
-// Notification panel - expand height only, no move/resize width
+// Expand the panel vertically without changing its width or position.
     useEffect(() => {
       let cancelled = false;
 
@@ -1012,7 +1011,7 @@ const debounce = (fn: Function, delay: number) => {
         className={`poster-shell condition-${weather.condition}`}
         style={{
           position: "relative",
-          width: "290px",  // Fixed widget width - notification style overlay
+          width: "290px",  // Keep the widget width fixed for the overlay layout.
           height: isExpanded ? "580px" : "240px",
           overflow: "hidden"
         }}
@@ -1067,7 +1066,7 @@ const debounce = (fn: Function, delay: number) => {
     width: '100%',
     boxSizing: 'border-box' as CSSProperties['boxSizing'],
     wordBreak: 'break-word' as CSSProperties['wordBreak'],
-    padding: 0 // Remove panel padding so header hits the edges naturally
+    padding: 0 // Remove panel padding so the header aligns with the panel edges.
   }}
 >
               <section 
@@ -1080,7 +1079,7 @@ const debounce = (fn: Function, delay: number) => {
                   WebkitBackdropFilter: isScrolled ? "blur(12px)" : "none",
                   transition: "backdrop-filter 0.2s ease, -webkit-backdrop-filter 0.2s ease",
                   padding: "24px 24px 12px 24px",
-                  borderTopLeftRadius: 'inherit', // Smoothly match the parent's rounded corners
+                  borderTopLeftRadius: 'inherit', // Match the parent corner radius.
                   borderTopRightRadius: 'inherit',
                   width: "100%",
                   boxSizing: "border-box"

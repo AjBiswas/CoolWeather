@@ -186,9 +186,9 @@ const sceneThemes: Record<
     cloudColor: "#b8bec3",     
     rainColor: "#93b6c9",
     orbColor: "#f8e69f",
-    orbOpacity: 0.7,           // less visible
-    orbScale: 0.38,            // medium size
-    showGlow: false,           // ❌ no glow in haze
+    orbOpacity: 0.7,           // Reduce visibility in haze conditions.
+    orbScale: 0.38,            // Use a medium orb size.
+    showGlow: false,           // Disable the glow in haze conditions.
     showRain: false,
     showLightning: false,
     showStars: false,
@@ -204,37 +204,37 @@ const sceneThemes: Record<
     emissiveIntensity: 1.0     
   },
   cloudy: {
-    cloudColor: "#c7d2e4",     // slightly bright grey-blue clouds
+    cloudColor: "#c7d2e4",     // Slightly brighter grey-blue clouds.
     rainColor: "#42bfff",
-    // ☀️ Sun almost hidden
+    // Keep the orb mostly obscured behind dense clouds.
     orbColor: "#d4dae5",
-    orbOpacity: 0.35,          // barely visible
-    orbScale: 0.28,            // small
-    showGlow: false,           // ❌ no glow
+    orbOpacity: 0.35,          // Keep the orb faint.
+    orbScale: 0.28,            // Use a smaller orb size.
+    showGlow: false,           // Disable the glow.
     showRain: false,
     showLightning: false,
     showStars: false,
-    // ☁️ Clouds heavy & dense
+    // Increase cloud density for overcast coverage.
     cloudOpacity: 0.95,
     cloudCount: 8,
-    // 🌥️ Background darker than haze
+    // Darken the background relative to haze.
     backgroundColor: "#7e97ba",
-    // 💡 Lighting (soft but slightly darker)
+    // Use softer and slightly dimmer lighting.
     ambientIntensity: 0.45,
     keyColor: "#f0f4f9",
     keyIntensity: 0.9,
     fillColor: "#cddedf",
     fillIntensity: 0.32,
     bounceIntensity: 0.2,
-    emissiveIntensity: 0.6      // very low (sun hidden)
+    emissiveIntensity: 0.6      // Keep emissive lighting low while the orb is hidden.
   },
   rain: {
-    cloudColor: "#8f9db5",     // darker clouds
-    rainColor: "#4fa8ff",      // slightly brighter rain (visible)
+    cloudColor: "#8f9db5",     // Darker cloud tone for rain scenes.
+    rainColor: "#4fa8ff",      // Increase rain visibility slightly.
 
-    // 🌙 Sun almost invisible
+    // Keep the orb nearly hidden during rainfall.
     orbColor: "#cfd6e2",
-    orbOpacity: 0.25,          // more hidden
+    orbOpacity: 0.25,          // Reduce orb visibility further.
     orbScale: 0.22,
     showGlow: false,
 
@@ -242,14 +242,14 @@ const sceneThemes: Record<
     showLightning: false,
     showStars: false,
 
-    // ☁️ Heavy clouds
+    // Use heavy cloud coverage.
     cloudOpacity: 1.0,
     cloudCount: 9,
 
-    // 🌧️ Dark rainy sky
+    // Darken the background for rainy weather.
     backgroundColor: "#4f6b8a",
 
-    // 💡 Lighting (darker + moody)
+    // Lower the light levels for a subdued scene.
     ambientIntensity: 0.38,
     keyColor: "#cfe3f7",
     keyIntensity: 0.75,
@@ -263,12 +263,12 @@ const sceneThemes: Record<
     cloudColor: "#2f3e5e",
     rainColor: "#6fbfff",
 
-    orbColor: "#e8ecf8",   // moon
+    orbColor: "#e8ecf8",   // Moon color.
     orbOpacity: 0.5,
     orbScale: 0.7,
     showGlow: false,
 
-    showRain: true,        // ✅ important
+    showRain: true,        // Keep precipitation enabled.
     showLightning: false,
     showStars: false,
 
@@ -288,12 +288,12 @@ const sceneThemes: Record<
   },
 
   storm: {
-    cloudColor: "#0f141f",     // darker clouds (almost black)
-    rainColor: "#5fb3ff",      // brighter rain streaks
+    cloudColor: "#0f141f",     // Near-black cloud tone for storms.
+    rainColor: "#5fb3ff",      // Brighten rain streaks for contrast.
 
-    // 🌙 Sun almost gone
+    // Push the orb almost entirely out of view.
     orbColor: "#c9d2e3",
-    orbOpacity: 0.15,          // barely visible
+    orbOpacity: 0.15,          // Keep the orb barely visible.
     orbScale: 0.22,
     showGlow: false,
 
@@ -301,14 +301,14 @@ const sceneThemes: Record<
     showLightning: true,
     showStars: false,
 
-    // ☁️ Heavy storm clouds
+    // Maximize storm cloud coverage.
     cloudOpacity: 1,
     cloudCount: 10,
 
-    // 🌩️ Deep storm sky
+    // Use a deeper background tone for storm scenes.
     backgroundColor: "#0a1224",
 
-    // 💡 Lighting (dramatic)
+    // Keep lighting low and directional.
     ambientIntensity: 0.32,
     keyColor: "#cfe8ff",
     keyIntensity: 0.7,
@@ -320,11 +320,11 @@ const sceneThemes: Record<
   },
   snow: {
     cloudColor: "#edf0f7",
-    rainColor: "#ffffff",      // ❄️ pure white snow
+    rainColor: "#ffffff",      // Render snow particles in white.
     showRain: true,
 
     orbColor: "#f7fbff",
-    orbOpacity: 0.5,           // softer sun
+    orbOpacity: 0.5,           // Soften the orb intensity.
     orbScale: 0.22,
     showGlow: false,
 
@@ -333,7 +333,7 @@ const sceneThemes: Record<
 
     backgroundColor: "#eaf4ff",
 
-    ambientIntensity: 0.6,     // brighter snow feel
+    ambientIntensity: 0.6,     // Lift ambient light for snowy scenes.
     keyColor: "#ffffff",
     keyIntensity: 1.0,
     fillColor: "#dfefff",
@@ -344,10 +344,10 @@ const sceneThemes: Record<
     cloudColor: "#f7e7dc",
     orbColor: "#ff9f54",
     orbOpacity: 1,
-    orbScale: 0.8,        // ☀️ slightly bigger sun
+    orbScale: 0.8,        // Use a slightly larger orb.
     showGlow: true,
 
-    backgroundColor: "#ff6a3d", // slightly deeper
+    backgroundColor: "#ff6a3d", // Deepen the sunset background tone.
 
     ambientIntensity: 0.5,
     keyColor: "#ffd6a3",
@@ -357,14 +357,14 @@ const sceneThemes: Record<
     bounceIntensity: 0.3
   },
  night: {
-    cloudColor: "#2f3e5e",     // slightly darker
+    cloudColor: "#2f3e5e",     // Slightly darker cloud tone.
     orbColor: "#f0f4ff",
 
-    orbOpacity: 0.8,           // 🌙 more visible moon
-    orbScale: 1.15,            // bigger moon
-    showGlow: true,            // subtle glow add karo
+    orbOpacity: 0.8,           // Make the moon more prominent.
+    orbScale: 1.15,            // Increase the moon size slightly.
+    showGlow: true,            // Retain a subtle glow.
 
-    backgroundColor: "#081a3a", // deeper night
+    backgroundColor: "#081a3a", // Deepen the night background tone.
 
     ambientIntensity: 0.4,
     keyColor: "#d9e7ff",
@@ -406,7 +406,7 @@ const sceneThemes: Record<
 
 function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z: number, scale: number, opacity: number) {
   
-  // 🔥 slight color variation for depth
+  // Apply subtle color variation to add depth.
   const variedColor = new THREE.Color(color).offsetHSL(
     0,
     0,
@@ -426,13 +426,13 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
   });
 
   const puff = new THREE.Mesh(
-    new THREE.SphereGeometry(0.52, 48, 48), // smoother sphere
+    new THREE.SphereGeometry(0.52, 48, 48), // Use a higher-detail sphere for smoother edges.
     material
   );
 
   puff.position.set(x, y, z);
 
-  // 🔥 random scaling for organic shape
+  // Vary the scale slightly to avoid uniform cloud shapes.
   puff.scale.set(
     scale,
     scale * (0.8 + Math.random() * 0.1),
@@ -470,7 +470,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         themeKey = "night";
       }
     } else {
-      themeKey = condition;   // ✅ THIS WAS MISSING
+      themeKey = condition;   // Use the daytime theme directly.
     }
 
     const baseTheme = sceneThemes[themeKey];
@@ -505,7 +505,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = null; // keep renderer transparent, no solid background
+    scene.background = null; // Keep the renderer background transparent.
 
     // new RGBELoader().load(
     //   "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
@@ -517,20 +517,20 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 100);
     camera.position.set(0, 0, 10.8);
 
-    // 🔥 Ambient light
+    // Base ambient light.
     scene.add(new THREE.AmbientLight("#ffffff", theme.ambientIntensity));
 
-    // 🔥 Main sunlight/moonlight
+    // Primary directional light for the sun or moon.
     const key = new THREE.DirectionalLight(theme.keyColor, theme.keyIntensity);
     key.position.set(-3, 4, 5);
     scene.add(key);
 
-    // 🔥 Fill light
+    // Secondary fill light.
     const fill = new THREE.DirectionalLight(theme.fillColor, theme.fillIntensity);
     fill.position.set(3, 2, 4);
     scene.add(fill);
 
-    // 🔥 Bottom bounce
+    // Low bounce light to soften shadows.
     const bounce = new THREE.DirectionalLight("#ffffff", theme.bounceIntensity);
     bounce.position.set(0, -3, 2);
     scene.add(bounce);
@@ -574,10 +574,10 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         : 0.85 + Math.random() * 0.2
     );
 
-    // 🔥 MAGIC: half clouds back, half front
+    // Split clouds between front and back layers.
     const isFront = i % 2 === 0;
 
-    // 🔥 shift front clouds sideways (moon cover na kare)
+    // Offset front-layer clouds to keep the orb visible.
     const offsetX = isFront ? (Math.random() > 0.5 ? 0.6 : -0.6) : 0;
 
       const initialX = jitterX + offsetX;
@@ -656,7 +656,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color(theme.orbColor),
       emissive: new THREE.Color(theme.orbColor),
-      emissiveIntensity: theme.emissiveIntensity || 1.4,   // 🔥 glow
+      emissiveIntensity: theme.emissiveIntensity || 1.4,   // Control orb glow strength.
       roughness: 0.4,
       metalness: 0,
       transparent: true,
@@ -671,7 +671,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     if (theme.showGlow && orb) {
       const glowGeometry = new THREE.CircleGeometry(theme.orbScale * 1.12, 48);
       const glowMaterial = new THREE.MeshBasicMaterial({
-      color: theme.orbColor,   // ✅ same as sun/moon
+      color: theme.orbColor,   // Match the orb color.
       transparent: true,
       opacity: 0.11,
       blending: THREE.AdditiveBlending,
@@ -700,7 +700,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
           starMaterial
         );
         const spreadX = -2 + Math.random() * 4;
-        const spreadY = 1.2 + Math.random() * 1.4; // bigger vertical spread
+        const spreadY = 1.2 + Math.random() * 1.4; // Spread stars across a taller vertical range.
 
         star.position.set(spreadX, spreadY, -2.1);
         star.renderOrder = -5;
@@ -926,7 +926,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
           }
         }
 
-        // 🔥 smooth lightning fade
+        // Fade lightning intensity in and out smoothly.
         if (isFlashing) {
           lightningMat.opacity = Math.min(1, lightningMat.opacity + 0.4);
           lightningGlowMat.opacity = Math.min(0.55, lightningGlowMat.opacity + 0.22);
