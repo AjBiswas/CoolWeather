@@ -6,7 +6,6 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 
 import { WeatherScene } from "./components/WeatherScene";
-import { TemperatureNumber } from "./components/TemperatureNumber";
 import { fallbackWeather } from "./data/mockWeather";
 import {
   fetchLiveWeather,
@@ -22,6 +21,17 @@ gsap.registerPlugin(useGSAP);
 const BASE_WIDGET_WIDTH = 300;
 const BASE_WIDGET_HEIGHT = 260;
 const EXPANDED_WIDGET_HEIGHT = 540;
+const PREVIEW_CONDITIONS: WeatherSnapshot["condition"][] = [
+  "clear",
+  "mostly-sunny",
+  "partly-cloudy",
+  "cloudy",
+  "haze",
+  "rain",
+  "storm",
+  "snow",
+  "sunset"
+];
 const zeroWeather: WeatherSnapshot = {
   ...fallbackWeather,
   city: "Location unavailable",
@@ -321,9 +331,21 @@ export default function App() {
     }
     const dx = event.clientX - resize.startX;
     const dy = event.clientY - resize.startY;
+    // Locked to the card's original aspect ratio - resizing width/height
+    // independently left the 3D scene (which scales by the more restrictive
+    // of the two ratios) unable to fill the wider dimension, showing as a
+    // big empty strip down the side. Using whichever axis implies the
+    // bigger change keeps the drag feeling responsive in every direction.
+    const widthScale = (resize.originWidth + dx) / resize.originWidth;
+    const heightScale = (resize.originHeight + dy) / resize.originHeight;
+    const scale = Math.max(widthScale, heightScale);
     setNativeCardRect((prev) =>
       prev
-        ? clampNativeCardRect({ ...prev, width: resize.originWidth + dx, height: resize.originHeight + dy })
+        ? clampNativeCardRect({
+            ...prev,
+            width: resize.originWidth * scale,
+            height: resize.originHeight * scale
+          })
         : prev
     );
   };
@@ -555,8 +577,10 @@ export default function App() {
   !weather.isNight;
   const historicalData = weather.historicalData ?? [];
 
-  // TEMP TEST HOOK - remove before finishing: #test=storm-night forces the
-  // scene condition for screenshotting each weather look in isolation.
+  // Dev-only scene preview override: #test=storm-night forces the WeatherScene
+  // into a specific condition/day-night combo regardless of live weather, so
+  // each look can be reviewed and tuned in isolation. Driven by the <select>
+  // rendered near the bottom of this component when running `npm run dev`.
   const [testHash, setTestHash] = useState(window.location.hash);
   useEffect(() => {
     const onHashChange = () => setTestHash(window.location.hash);
@@ -566,6 +590,16 @@ export default function App() {
   const testMatch = testHash.match(/test=([a-z-]+)-(day|night)/);
   const displayCondition = (testMatch ? testMatch[1] : weather.condition) as WeatherSnapshot["condition"];
   const displayIsNight = testMatch ? testMatch[2] === "night" : Boolean(weather.isNight);
+  const previewValue = testMatch ? `${testMatch[1]}-${testMatch[2]}` : "";
+  const handlePreviewChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    window.location.hash = event.target.value ? `test=${event.target.value}` : "";
+  };
+
+  // NOTE: the storm lightning-strike -> temperature-number burn/ash/regen
+  // effect that used to live here was wired to the old 2D-canvas
+  // TemperatureNumber. It's being re-built directly inside WeatherScene now
+  // that the digits are real 3D meshes in that same scene (see the TODO at
+  // the strike-decision point in WeatherScene.tsx) - not ported yet.
 
   const layout = useMemo(() => {
     const widthRatio = widgetSize.width / BASE_WIDGET_WIDTH;
@@ -578,10 +612,12 @@ export default function App() {
     const numberWidth = Math.round(numberFontSize * 1.34);
     const numberHeight = Math.round(numberFontSize * 1.46);
     const numberTop = Math.round(widgetSize.height * 0.28);
-    // numberHeight is the canvas box, not the visible glyph bottom - the glyph
-    // sits well above the box's own bottom edge, so pull the label up into that
-    // slack instead of stacking below the full canvas height.
-    const labelTop = numberTop + numberHeight - Math.max(14, Math.round(widgetSize.height * 0.08));
+    // The temperature digits render as real 3D geometry inside WeatherScene
+    // now, not this canvas box, and they sit lower in the frame than this
+    // box does (closer to the rain) - push the label down near the bottom
+    // of that box instead of pulling it up into it, or it overlaps the
+    // digits' real on-screen position.
+    const labelTop = numberTop + numberHeight + Math.round(widgetSize.height * 0.05);
     const labelFontSize = Math.max(14, Math.round(numberFontSize * 0.16));
     const locationTop = labelTop + Math.max(18, Math.round(labelFontSize * 1.3));
     const locationFontSize = Math.max(10, Math.round(labelFontSize * 0.62));
@@ -826,7 +862,11 @@ const debounce = (fn: Function, delay: number) => {
       >
         <div className="poster-frame poster-scene-frame" style={sceneFrameStyle}>
           <div className="poster-scene">
-            <WeatherScene condition={displayCondition} temperature={weather.temperatureC} isNight={displayIsNight} />
+            <WeatherScene
+              condition={displayCondition}
+              isNight={displayIsNight}
+              numberText={temperatureDisplay}
+            />
           </div>
         </div>
 
@@ -841,19 +881,19 @@ const debounce = (fn: Function, delay: number) => {
         ) : null}
 
         <div className="poster-hero">
+          {/*
+            The digits themselves now render as real 3D geometry inside
+            WeatherScene (the WebGL canvas behind this), not here - this
+            button just keeps the same click-to-expand hit target and
+            accessibility label at the number's on-screen position.
+          */}
           <button
             type="button"
             className={`poster-number-wrap poster-number-button${showTempPlaceholder ? " is-placeholder" : ""}`}
             style={numberWrapStyle}
             aria-label={showTempPlaceholder ? "Temperature unavailable" : `${Math.round(weather.temperatureC)} degrees`}
             onClick={expandPanel}
-          >
-            <TemperatureNumber
-              value={temperatureDisplay}
-              width={layout.numberWidth}
-              height={layout.numberHeight}
-            />
-          </button>
+          />
 
           <div className="poster-label" style={labelStyle}>
             {displayConditionName(weather.condition, Boolean(weather.isNight))}
@@ -1099,6 +1139,36 @@ const debounce = (fn: Function, delay: number) => {
           </div>
         ) : null}
     </main>
+    {import.meta.env.DEV ? (
+      <select
+        value={previewValue}
+        onChange={handlePreviewChange}
+        title="Preview a weather scene without live data"
+        style={{
+          position: "fixed",
+          top: 4,
+          left: 4,
+          zIndex: 9999,
+          maxWidth: "132px",
+          fontSize: "10px",
+          background: "rgba(10, 12, 18, 0.75)",
+          color: "#fff",
+          border: "1px solid rgba(255, 255, 255, 0.3)",
+          borderRadius: "4px",
+          padding: "2px 3px"
+        }}
+      >
+        <option value="">Live weather</option>
+        {PREVIEW_CONDITIONS.flatMap((condition) => [
+          <option key={`${condition}-day`} value={`${condition}-day`}>
+            {condition} (day)
+          </option>,
+          <option key={`${condition}-night`} value={`${condition}-night`}>
+            {condition} (night)
+          </option>
+        ])}
+      </select>
+    ) : null}
     </>
   );
 }

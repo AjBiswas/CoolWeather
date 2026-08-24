@@ -128,9 +128,11 @@ body.is-native-app,
   -webkit-app-region: no-drag;
 }
 
+.temperature-number-digit {
+  position: relative;
+}
+
 .temperature-number-canvas {
-  position: absolute;
-  inset: 0;
   display: block;
 }
 

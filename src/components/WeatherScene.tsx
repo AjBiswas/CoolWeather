@@ -3,11 +3,13 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader";
 import type { WeatherCondition } from "../types";
+import { layoutText } from "../lib/digitGeometry";
 
 interface WeatherSceneProps {
   condition: WeatherCondition;
-  temperature: number;
   isNight?: boolean;
+  /** The temperature digits to render as real 3D geometry, e.g. "31" or "--". */
+  numberText: string;
 }
 
 type ThemeKey =
@@ -515,6 +517,11 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
     new THREE.SphereGeometry(0.52, 48, 48), // Use a higher-detail sphere for smoother edges.
     material
   );
+  // Puffs shadow each other (see the key light's shadow config) - this is
+  // what carves out distinct, individually-lit lobes in a dense cluster
+  // instead of every sphere looking lit the same regardless of neighbors.
+  puff.castShadow = true;
+  puff.receiveShadow = true;
 
   puff.position.set(x, y, z);
 
@@ -530,10 +537,17 @@ function addCloudPuff(group: THREE.Group, color: string, x: number, y: number, z
 }
 
 
-export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
+export function WeatherScene({ condition, isNight, numberText }: WeatherSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
-
+  // The condition/isNight effect below tears down and rebuilds the entire
+  // scene (clouds, lightning, camera, the lot). numberText changes far more
+  // often than that (every temperature refresh) and shouldn't cause the same
+  // full rebuild, so it's handled by a second, separate effect further down
+  // that reaches into the still-live scene through this ref instead.
+  const rebuildNumberRef = useRef<(text: string) => void>(() => {});
+  const numberTextRef = useRef(numberText);
+  numberTextRef.current = numberText;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -590,6 +604,9 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         ? 0
         : Math.max((baseTheme as any).emissiveIntensity ?? 1.4, isNight ? 1.9 : 1.6)
     };
+    // Rain (not snow, which reuses showRain with a white rainColor) - the
+    // number grows small water droplets sliding down its surface in these.
+    const numberIsWet = theme.showRain && theme.rainColor !== "#ffffff";
     const width = mount.clientWidth;
     const height = mount.clientHeight;
 
@@ -597,10 +614,31 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Needed so the temperature number's own light (below) can cast real
+    // shadows from its 3D geometry, instead of the old hand-painted ellipse.
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Three scenes sharing one renderer/camera, drawn back-to-front each
+    // frame (see the render loop below): `scene` is the sky (clouds, rain,
+    // orb), `numberScene` is the temperature number, `lightningScene` is
+    // just the bolt. `scene`/`numberScene` are split because Three's
+    // standard material lighting is scene-global - every light in a scene
+    // affects every lit object in it. Without that split, the theme's
+    // key/fill/bounce lights (which change color and intensity per weather
+    // condition) would also spill onto the number, flattening its shading
+    // and making it look different in every condition instead of the same
+    // legible white+red-rim look everywhere. `lightningScene` is split out
+    // for a different reason - draw order: it needs to render after (on top
+    // of) the number so a strike visually lands on the number instead of
+    // being hidden behind it.
+    renderer.autoClear = false;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
     scene.background = null; // Keep the renderer background transparent.
+
+    const numberScene = new THREE.Scene();
+    const lightningScene = new THREE.Scene();
 
     // new RGBELoader().load(
     //   "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
@@ -617,9 +655,22 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     scene.add(new THREE.AmbientLight("#ffffff", theme.ambientIntensity * 0.78));
 
     // Primary directional light for the sun or moon - boosted for stronger
-    // contrast between lit and shadowed cloud puffs.
+    // contrast between lit and shadowed cloud puffs. Casts real shadows so
+    // puffs shadow each other where they overlap, instead of every puff
+    // being lit as if it were alone - this is what gives the cluster its
+    // sculpted, individually-lobed look instead of a flat blob.
     const key = new THREE.DirectionalLight(theme.keyColor, theme.keyIntensity * 1.35);
     key.position.set(-3, 4, 5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(512, 512);
+    key.shadow.camera.left = -3;
+    key.shadow.camera.right = 3;
+    key.shadow.camera.top = 3;
+    key.shadow.camera.bottom = -3;
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 12;
+    key.shadow.bias = -0.0015;
+    key.shadow.radius = 3; // soften the puff-to-puff shadow edges a little
     scene.add(key);
 
     // Secondary fill light.
@@ -648,7 +699,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       themeKey === "rain" ||
       themeKey === "rainy-night" ||
       themeKey === "storm"
-        ? 0.6
+        ? 0.2
         : 0;
     const orbHighlightColor = new THREE.Color(theme.orbColor);
 
@@ -755,6 +806,353 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     cloud.add(underShadow);
     scene.add(cloud);
 
+    // ------------------------------------------------------------------
+    // TEMPERATURE NUMBER - real extruded 3D glyphs built from the app's own
+    // Bebas Neue font (see src/lib/digitGeometry.ts), replacing the old
+    // 2D-canvas fake-3D. Lit by its own small rig below instead of the
+    // theme's key/fill/bounce lights above, so it stays legible and reads
+    // the same bright white in every condition - matching how it always
+    // looked before this was real geometry, rather than getting moody/dim
+    // along with the sky during storm/night themes.
+    // ------------------------------------------------------------------
+    // Template only - each digit gets its own clone (below) so a lightning
+    // strike can char/fade one digit's material without touching the rest.
+    const numberMaterialTemplate = new THREE.MeshStandardMaterial({
+      color: "#f4f5f8",
+      roughness: 0.38,
+      metalness: 0.06
+    });
+    const NUMBER_BASE_COLOR = new THREE.Color("#f4f5f8");
+    const NUMBER_CHAR_COLOR = new THREE.Color("#160e0b");
+
+    // Casts the shadow every digit falls onto numberShadowCatcher below -
+    // shadow camera frustum is just big enough to cover the number's area.
+    const numberKeyLight = new THREE.DirectionalLight("#e8ecf5", 2.4);
+    numberKeyLight.position.set(0.6, 1.7, 3.2);
+    numberKeyLight.castShadow = true;
+    numberKeyLight.shadow.mapSize.set(512, 512);
+    numberKeyLight.shadow.camera.left = -2.2;
+    numberKeyLight.shadow.camera.right = 2.2;
+    numberKeyLight.shadow.camera.top = 2.2;
+    numberKeyLight.shadow.camera.bottom = -2.2;
+    numberKeyLight.shadow.camera.near = 1;
+    numberKeyLight.shadow.camera.far = 7;
+    numberKeyLight.shadow.bias = -0.0025;
+    numberScene.add(numberKeyLight);
+    // A DirectionalLight's shadow camera looks from its position toward its
+    // target (the origin by default) - since the number sits well below
+    // world y=0 (see numberGroup below), the target needs to follow it or
+    // the shadow camera stays centered on empty space and the shadow clips.
+    numberScene.add(numberKeyLight.target);
+
+    // Small ambient lift so the number's shadow side doesn't fall to pure
+    // black - scoped to numberScene, so it can't wash out the moody dark
+    // clouds in storm/night themes the way a scene-wide ambient would.
+    numberScene.add(new THREE.AmbientLight("#ffffff", 0.26));
+
+    // The same red rim-glow accent the reference look (and the old 2D
+    // version) used along the top edges of each digit.
+    const numberRimLight = new THREE.PointLight("#ff2a1f", 10, 10, 2);
+    numberRimLight.position.set(-0.3, 0.9, 1.6);
+    numberScene.add(numberRimLight);
+
+    const numberFillLight = new THREE.DirectionalLight("#6f8fff", 0.22);
+    numberFillLight.position.set(-1.4, -0.2, 1.6);
+    numberScene.add(numberFillLight);
+
+    const numberGroup = new THREE.Group();
+    // Lower in the frame than the clouds, closer to where the falling rain
+    // reaches and the city/location label sits below.
+    numberGroup.position.set(0, -0.64, 0.9);
+    numberScene.add(numberGroup);
+    numberKeyLight.target.position.copy(numberGroup.position);
+
+    // Invisible except where numberGroup's cast shadow actually lands on it -
+    // this is what gives each digit its own real, individually-shaped
+    // shadow, instead of one hand-painted ellipse shared by the whole number.
+    const numberShadowCatcher = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 2),
+      new THREE.ShadowMaterial({ opacity: 0.48 })
+    );
+    // Close beneath the digits' own bottom edge, not the middle of the
+    // scene - too far below and the shadow reads as a second, disconnected
+    // "ghost" number instead of grounding the real one.
+    numberShadowCatcher.position.set(0, -1.38, 0.7);
+    numberShadowCatcher.receiveShadow = true;
+    numberScene.add(numberShadowCatcher);
+
+    const NUMBER_SCALE = 0.00205;
+    let numberLetterMeshes: THREE.Mesh[] = [];
+    let numberBuildToken = 0;
+    let sceneDisposed = false;
+
+    // --- Storm wind: each digit sways independently, like it's being ---
+    // --- buffeted, rather than the whole number moving as one block.  ---
+    function makeWindMotion() {
+      return {
+        phase: Math.random() * Math.PI * 2,
+        freqX: 1.0 + Math.random() * 0.7,
+        freqY: 1.5 + Math.random() * 0.8,
+        ampX: 0.028 + Math.random() * 0.02,
+        ampY: 0.012 + Math.random() * 0.01,
+        rotAmp: 0.045 + Math.random() * 0.03
+      };
+    }
+
+    // --- Lightning burn: ignite (char sweeps down) -> ash (crumbles to ---
+    // --- nothing, with flecks) -> pause (gone) -> regen (glows back in). --
+    const IGNITE_MS = 320;
+    const ASH_MS = 380;
+    const PAUSE_MS = 220;
+    const REGEN_MS = 480;
+    const DIGIT_BURN_STAGGER_MS = 55;
+
+    function phaseDurationMs(phase: string) {
+      if (phase === "ignite") return IGNITE_MS;
+      if (phase === "ash") return ASH_MS;
+      if (phase === "pause") return PAUSE_MS;
+      if (phase === "regen") return REGEN_MS;
+      return 1;
+    }
+    function nextBurnPhase(phase: string) {
+      if (phase === "ignite") return "ash";
+      if (phase === "ash") return "pause";
+      if (phase === "pause") return "regen";
+      return "idle";
+    }
+    function easeOutBack(t: number) {
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      const x = t - 1;
+      return 1 + c3 * x * x * x + c1 * x * x;
+    }
+
+    // Small ember/ash flecks that fly out of a digit while it's crumbling -
+    // plain children of the digit mesh so they inherit its position for
+    // free and get cleaned up automatically when the mesh is removed.
+    function spawnAshFlecks(mesh: THREE.Mesh) {
+      const fleckGeometry = new THREE.BoxGeometry(10, 10, 10);
+      const flecks: { mesh: THREE.Mesh; angle: number; speed: number }[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const ember = Math.random() > 0.45;
+        const fleckMaterial = new THREE.MeshBasicMaterial({
+          color: ember ? "#ffab5c" : "#161311",
+          transparent: true,
+          opacity: 1
+        });
+        const fleck = new THREE.Mesh(fleckGeometry, fleckMaterial);
+        fleck.position.set(0, 0, 40);
+        mesh.add(fleck);
+        flecks.push({
+          mesh: fleck,
+          angle: -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3,
+          speed: 90 + Math.random() * 140
+        });
+      }
+      return flecks;
+    }
+
+    // --- Wet look: small droplets sliding down the digit's front face, ---
+    // --- only spawned when numberIsWet (rain/storm/rainy-night). ---
+    // Shared geometry/material - only position/scale differ per droplet, so
+    // there's no need for each of the ~5 droplets per digit to own one.
+    const dropletGeometry = new THREE.SphereGeometry(9, 10, 8);
+    dropletGeometry.scale(1, 1.6, 0.6); // squashed into a teardrop pressed flat against the surface
+    const dropletMaterial = new THREE.MeshStandardMaterial({
+      color: "#eaf6ff",
+      emissive: "#bcdcff",
+      emissiveIntensity: 0.35, // a little self-glow so tiny droplets still read against a dark digit
+      transparent: true,
+      opacity: 0.85,
+      roughness: 0.08,
+      metalness: 0
+    });
+    // Sits just proud of the extrusion's camera-facing cap (depth=260 below)
+    // so droplets don't z-fight with/clip into the glyph surface.
+    const DROPLET_FRONT_Z = 266;
+
+    function spawnRainDroplets(mesh: THREE.Mesh) {
+      const box = mesh.geometry.boundingBox;
+      if (!box) {
+        return [];
+      }
+      const droplets: { mesh: THREE.Mesh; speed: number; minX: number; maxX: number; topY: number; bottomY: number }[] = [];
+      const count = 6 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < count; i += 1) {
+        const droplet = new THREE.Mesh(dropletGeometry, dropletMaterial);
+        const x = box.min.x + Math.random() * (box.max.x - box.min.x);
+        const y = box.min.y + Math.random() * (box.max.y - box.min.y);
+        droplet.position.set(x, y, DROPLET_FRONT_Z);
+        const s = 0.7 + Math.random() * 0.6;
+        droplet.scale.set(s, s * (1 + Math.random() * 0.4), s);
+        mesh.add(droplet);
+        droplets.push({
+          mesh: droplet,
+          speed: 35 + Math.random() * 45,
+          minX: box.min.x,
+          maxX: box.max.x,
+          topY: box.max.y,
+          bottomY: box.min.y
+        });
+      }
+      return droplets;
+    }
+
+    // Loads/builds the glyphs for `text` and swaps numberGroup's children
+    // once ready. Async because the font (and each new character's
+    // geometry) loads/builds lazily - see digitGeometry.ts. numberBuildToken
+    // guards against an in-flight call from a stale, since-superseded text
+    // value clobbering a newer one once it resolves.
+    const rebuildNumber = (text: string) => {
+      const token = ++numberBuildToken;
+      layoutText(text).then((layout) => {
+        if (sceneDisposed || token !== numberBuildToken) {
+          return;
+        }
+        numberLetterMeshes.forEach((mesh) => numberGroup.remove(mesh));
+        numberLetterMeshes = layout.letters.map((letter) => {
+          const material = numberMaterialTemplate.clone();
+          const mesh = new THREE.Mesh(letter.geometry, material);
+          mesh.castShadow = true;
+          const baseX = (letter.x - layout.centerX) * NUMBER_SCALE;
+          const baseY = -layout.centerY * NUMBER_SCALE;
+          mesh.position.set(baseX, baseY, 0);
+          mesh.scale.setScalar(NUMBER_SCALE);
+          mesh.userData.baseX = baseX;
+          mesh.userData.baseY = baseY;
+          mesh.userData.wind = makeWindMotion();
+          mesh.userData.burnPhase = "idle";
+          mesh.userData.burnPhaseStart = 0;
+          mesh.userData.flecks = [];
+          mesh.userData.droplets = numberIsWet ? spawnRainDroplets(mesh) : [];
+          numberGroup.add(mesh);
+          return mesh;
+        });
+      });
+    };
+
+    // Exposed so the separate numberText effect (below, in the component
+    // body) can update just the digits without tearing down this whole
+    // condition/isNight-driven scene.
+    rebuildNumberRef.current = rebuildNumber;
+    rebuildNumber(numberTextRef.current);
+
+    // Starts every currently-idle digit's burn cycle, each offset a little
+    // so the whole number doesn't ignite/reform in perfect unison.
+    function triggerNumberBurn(nowMs: number) {
+      numberLetterMeshes.forEach((mesh, index) => {
+        if (mesh.userData.burnPhase !== "idle") {
+          return;
+        }
+        mesh.userData.burnPhase = "ignite";
+        mesh.userData.burnPhaseStart = nowMs + index * DIGIT_BURN_STAGGER_MS;
+      });
+    }
+
+    // Called every frame: applies wind sway (storm only), slides rain
+    // droplets down each digit's face, and steps the burn animation forward.
+    function updateNumberDigits(nowMs: number, deltaSeconds: number, windActive: boolean) {
+      numberLetterMeshes.forEach((mesh) => {
+        const wind = mesh.userData.wind;
+        if (windActive) {
+          const t = nowMs / 1000;
+          const sway =
+            Math.sin(t * wind.freqX + wind.phase) * wind.ampX * 0.6 +
+            Math.sin(t * wind.freqX * 1.9 + wind.phase * 1.4) * wind.ampX * 0.4;
+          const bob = Math.sin(t * wind.freqY + wind.phase) * wind.ampY;
+          const rot = Math.sin(t * wind.freqX * 0.8 + wind.phase) * wind.rotAmp;
+          mesh.position.x = mesh.userData.baseX + sway;
+          mesh.position.y = mesh.userData.baseY + bob;
+          mesh.rotation.z = rot;
+        } else if (mesh.rotation.z !== 0 || mesh.position.x !== mesh.userData.baseX) {
+          mesh.position.x = mesh.userData.baseX;
+          mesh.position.y = mesh.userData.baseY;
+          mesh.rotation.z = 0;
+        }
+
+        if (mesh.visible && mesh.userData.droplets.length > 0) {
+          type Droplet = { mesh: THREE.Mesh; speed: number; minX: number; maxX: number; topY: number; bottomY: number };
+          mesh.userData.droplets.forEach((droplet: Droplet) => {
+            droplet.mesh.position.y -= droplet.speed * deltaSeconds;
+            if (droplet.mesh.position.y < droplet.bottomY) {
+              // Back to a fresh random spot near the top, not just straight
+              // back up the same column - reads as a new droplet forming.
+              droplet.mesh.position.y = droplet.topY;
+              droplet.mesh.position.x = droplet.minX + Math.random() * (droplet.maxX - droplet.minX);
+            }
+          });
+        }
+
+        const phase = mesh.userData.burnPhase;
+        if (phase === "idle") {
+          return;
+        }
+
+        if (nowMs < mesh.userData.burnPhaseStart) {
+          return; // staggered start - not this digit's turn yet
+        }
+
+        const elapsedInPhase = nowMs - mesh.userData.burnPhaseStart;
+        const duration = phaseDurationMs(phase);
+        const localT = Math.min(1, elapsedInPhase / duration);
+        const material = mesh.material as THREE.MeshStandardMaterial;
+
+        if (phase === "ignite") {
+          mesh.visible = true;
+          mesh.scale.setScalar(NUMBER_SCALE);
+          material.opacity = 1;
+          material.transparent = false;
+          material.color.copy(NUMBER_BASE_COLOR).lerp(NUMBER_CHAR_COLOR, localT);
+          material.emissive.set("#ff7a3d");
+          material.emissiveIntensity = Math.sin(localT * Math.PI) * 0.9;
+        } else if (phase === "ash") {
+          if (mesh.userData.flecks.length === 0) {
+            mesh.userData.flecks = spawnAshFlecks(mesh);
+          }
+          mesh.visible = true;
+          material.transparent = true;
+          material.color.copy(NUMBER_CHAR_COLOR);
+          material.emissive.set("#3a1a10");
+          material.emissiveIntensity = Math.max(0, 0.4 * (1 - localT));
+          material.opacity = 1 - localT;
+
+          const flyOut = easeOutBack(Math.min(1, localT * 0.9));
+          mesh.userData.flecks.forEach((fleck: { mesh: THREE.Mesh; angle: number; speed: number }) => {
+            const dist = fleck.speed * flyOut;
+            fleck.mesh.position.x = Math.cos(fleck.angle) * dist;
+            fleck.mesh.position.y = Math.sin(fleck.angle) * dist - localT * 60;
+            const fleckMaterial = fleck.mesh.material as THREE.MeshBasicMaterial;
+            fleckMaterial.opacity = Math.max(0, 1 - localT * 1.15);
+          });
+        } else if (phase === "pause") {
+          mesh.visible = false;
+        } else if (phase === "regen") {
+          mesh.userData.flecks.forEach((fleck: { mesh: THREE.Mesh }) => mesh.remove(fleck.mesh));
+          mesh.userData.flecks = [];
+          mesh.visible = true;
+          material.transparent = true;
+          material.color.copy(NUMBER_CHAR_COLOR).lerp(NUMBER_BASE_COLOR, Math.min(1, localT * 1.4));
+          const flashT = Math.max(0, 1 - localT / 0.55);
+          material.emissive.set("#fff4d6");
+          material.emissiveIntensity = flashT * 1.1;
+          material.opacity = Math.min(1, localT * 1.6);
+        }
+
+        if (localT >= 1) {
+          mesh.userData.burnPhase = nextBurnPhase(phase);
+          mesh.userData.burnPhaseStart = nowMs;
+          if (mesh.userData.burnPhase === "idle") {
+            material.opacity = 1;
+            material.transparent = false;
+            material.color.copy(NUMBER_BASE_COLOR);
+            material.emissiveIntensity = 0;
+            mesh.scale.setScalar(NUMBER_SCALE);
+            mesh.visible = true;
+          }
+        }
+      });
+    }
+
     const orb = !isHiddenOrbScene ? new THREE.Mesh(
     new THREE.CircleGeometry(theme.orbScale, 48),
     new THREE.MeshBasicMaterial({
@@ -820,16 +1218,21 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
 
     const rainGroup = new THREE.Group();
     const rainMotions: RainMotion[] = [];
+    // Small rounded droplets, same shape/size family as the droplets that
+    // slide down the number's face (see spawnRainDroplets in the number
+    // section below) - falling rain and "wet number" droplets should read
+    // as the same water, not two unrelated particle styles.
+    const rainDropGeometry = new THREE.SphereGeometry(0.045, 8, 6);
+    rainDropGeometry.scale(1, 1.5, 0.55);
     if (theme.showRain) {
       for (let index = 0; index < 18; index += 1) {
         const anchor = cloudMotions[index % Math.max(cloudMotions.length, 1)];
-        const length = 0.38 + Math.random() * 0.24;
+        const length = 0.26 + Math.random() * 0.16; // still drives the fall-cycle distance below
         const drop = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, length, 0.02),
+          rainDropGeometry,
           new THREE.MeshBasicMaterial({ color: theme.rainColor })
         );
         drop.position.set((Math.random() - 0.5) * 4.2, 1.1 + Math.random() * 2.1, (Math.random() - 0.5) * 0.6);
-        drop.rotation.z = 0.16;
         rainGroup.add(drop);
         if (anchor) {
           rainMotions.push({
@@ -929,8 +1332,54 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     l3.rotation.z = 0.38;
     l3.renderOrder = 7;
     lightning.add(l3);
+
+    // Storm-only continuation: the original three segments stayed within the
+    // cloud band. These extend the same jagged path on down through the
+    // number's on-screen area so a storm strike reads as hitting the number,
+    // not just flashing somewhere above it.
+    const isStormScene = themeKey === "storm";
+    const l4Glow = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.03), lightningGlowMat);
+    l4Glow.position.set(0.61, 0.22, 0.8);
+    l4Glow.rotation.z = -0.5;
+    l4Glow.renderOrder = 6;
+    l4Glow.visible = isStormScene;
+    lightning.add(l4Glow);
+    const l4 = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.27, 0.02), lightningMat);
+    l4.position.set(0.61, 0.22, 0.82);
+    l4.rotation.z = -0.5;
+    l4.renderOrder = 7;
+    l4.visible = isStormScene;
+    lightning.add(l4);
+    const l5Glow = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.36, 0.03), lightningGlowMat);
+    l5Glow.position.set(0.47, -0.13, 0.8);
+    l5Glow.rotation.z = 0.42;
+    l5Glow.renderOrder = 6;
+    l5Glow.visible = isStormScene;
+    lightning.add(l5Glow);
+    const l5 = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.33, 0.02), lightningMat);
+    l5.position.set(0.47, -0.13, 0.82);
+    l5.rotation.z = 0.42;
+    l5.renderOrder = 7;
+    l5.visible = isStormScene;
+    lightning.add(l5);
+    const l6Glow = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.32, 0.03), lightningGlowMat);
+    l6Glow.position.set(0.56, -0.47, 0.8);
+    l6Glow.rotation.z = -0.32;
+    l6Glow.renderOrder = 6;
+    l6Glow.visible = isStormScene;
+    lightning.add(l6Glow);
+    const l6 = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.29, 0.02), lightningMat);
+    l6.position.set(0.56, -0.47, 0.82);
+    l6.rotation.z = -0.32;
+    l6.renderOrder = 7;
+    l6.visible = isStormScene;
+    lightning.add(l6);
+
     lightning.renderOrder = 6;
-    scene.add(lightning);
+    // Its own scene, rendered last (see the render loop) so the bolt draws
+    // on top of the number instead of being hidden behind it - it should
+    // read as striking down onto the number, not flashing somewhere behind.
+    lightningScene.add(lightning);
 
     // A real point light at the strike position, not a flat scene-wide tint -
     // physical falloff (distance/decay) naturally gives more light near the
@@ -943,6 +1392,10 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     let frameId = 0;
     let lightningTimer = 0;
     let isFlashing = false;
+    // Cooldown between number burn cycles - storm strikes flash roughly
+    // every 0.6-1.8s, far more often than the ~1.5s burn animation needs to
+    // restart, so most strikes just flash without re-igniting the number.
+    let lastNumberBurnAtMs = -Infinity;
 
     const animate = () => {
       const delta = clock.getDelta();
@@ -955,6 +1408,8 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       if (orb) {
         orb.position.y = 1.08 + Math.sin(elapsed * 1.4) * 0.025;
       }
+
+      updateNumberDigits(performance.now(), delta, isStormScene);
 
       cloudMotions.forEach((cloudMotion, index) => {
         const rawDrift = ((elapsed * cloudMotion.driftSpeed) + index * 0.73) % cloudMotion.driftSpan;
@@ -1039,6 +1494,14 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
             const strikeY = 0.15 + Math.random() * 0.35;
             lightning.position.set(strikeX, strikeY, 0);
             lightningFlashLight.position.set(strikeX + 0.5, strikeY + 1.0, 1.3);
+
+            if (isStormScene) {
+              const nowMs = performance.now();
+              if (nowMs - lastNumberBurnAtMs > 4500) {
+                lastNumberBurnAtMs = nowMs;
+                triggerNumberBurn(nowMs);
+              }
+            }
           } else {
             isFlashing = false;
             lightningTimer = cooldownMin + Math.random() * (cooldownMax - cooldownMin);
@@ -1057,7 +1520,18 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         }
       }
 
+      // Three passes, back to front, into the same canvas (autoClear is off -
+      // see the note by its declaration above): sky, then the number, then
+      // the lightning bolt last so it draws on top of the number - clearing
+      // just the depth buffer between each keeps every scene's own
+      // lights/shadows from leaking into the others.
+      renderer.clear();
       renderer.render(scene, camera);
+      renderer.clearDepth();
+      renderer.render(numberScene, camera);
+      renderer.clearDepth();
+      renderer.render(lightningScene, camera);
+
       frameId = window.requestAnimationFrame(animate);
     };
 
@@ -1074,22 +1548,33 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     window.addEventListener("resize", onResize);
 
     return () => {
+      sceneDisposed = true;
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (Array.isArray(object.material)) {
-            object.material.forEach((material) => material.dispose());
-          } else {
-            object.material.dispose();
+      [scene, numberScene, lightningScene].forEach((disposedScene) => {
+        disposedScene.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.geometry.dispose();
+            if (Array.isArray(object.material)) {
+              object.material.forEach((material) => material.dispose());
+            } else {
+              object.material.dispose();
+            }
           }
-        }
+        });
       });
       mount.removeChild(renderer.domElement);
     };
   }, [condition, isNight]);
+
+  // Updates just the digits when the temperature changes (e.g. the 5-minute
+  // weather refresh) without rebuilding clouds/lightning/camera along with
+  // it - see rebuildNumberRef's declaration above for why this is separate
+  // from the condition/isNight effect.
+  useEffect(() => {
+    rebuildNumberRef.current(numberText);
+  }, [numberText]);
 
   return <div className="weather-scene" ref={mountRef} aria-hidden="true" />;
 }

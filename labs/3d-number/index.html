@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Number Lab</title>
+  <style>
+    /* Full-bleed dark stage, matching the reference photo's plain black backdrop. */
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #050505;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    #hint {
+      position: fixed;
+      left: 12px;
+      bottom: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      font: 12px system-ui, sans-serif;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hint">drag = rotate · scroll = zoom</div>
+  <!-- main.js does all the work; see that file for the actual build steps. -->
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
