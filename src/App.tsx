@@ -608,15 +608,22 @@ export default function App() {
     // widget size. Native mobile lets the user freely resize the card larger via the
     // resize handle, so the scene needs to scale up past 1x to fill it.
     const sceneScale = isNativeApp ? Math.min(widthRatio, heightRatio) : Math.min(widthRatio, heightRatio, 1);
+    // Cosmetic only (label text sizing below) - not tied to the click-target
+    // box, since the actual digits are real 3D geometry now, not a canvas
+    // drawn into this box.
     const numberFontSize = Math.round(Math.min(widgetSize.width * 0.32, widgetSize.height * 0.42));
-    const numberWidth = Math.round(numberFontSize * 1.34);
-    const numberHeight = Math.round(numberFontSize * 1.46);
-    const numberTop = Math.round(widgetSize.height * 0.28);
-    // The temperature digits render as real 3D geometry inside WeatherScene
-    // now, not this canvas box, and they sit lower in the frame than this
-    // box does (closer to the rain) - push the label down near the bottom
-    // of that box instead of pulling it up into it, or it overlaps the
-    // digits' real on-screen position.
+    // This box is purely an invisible click/tap target + accessibility
+    // label now (see the button in the JSX below) - the digits themselves
+    // render as real 3D geometry in WeatherScene, positioned independently.
+    // These fractions are matched to that 3D position/size (numberGroup's
+    // position and NUMBER_SCALE in WeatherScene.tsx) so tapping the number
+    // you actually see is what opens the panel - if that 3D position ever
+    // moves again, re-derive these the same way (or nothing should open the
+    // panel except the number itself, per the interaction rule this exists
+    // for).
+    const numberWidth = Math.round(widgetSize.width * 0.4);
+    const numberHeight = Math.round(widgetSize.height * 0.33);
+    const numberTop = Math.round(widgetSize.height * 0.47);
     const labelTop = numberTop + numberHeight + Math.round(widgetSize.height * 0.05);
     const labelFontSize = Math.max(14, Math.round(numberFontSize * 0.16));
     const locationTop = labelTop + Math.max(18, Math.round(labelFontSize * 1.3));

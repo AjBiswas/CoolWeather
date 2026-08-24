@@ -795,15 +795,6 @@ export function WeatherScene({ condition, isNight, numberText }: WeatherScenePro
   }
 
 
-    // Ground shadow beneath the number/scene - always present regardless of
-    // cloud count, since it grounds the whole composition, not just the clouds.
-    const underShadow = new THREE.Mesh(
-      new THREE.SphereGeometry(1.6, 32, 32),
-      new THREE.MeshBasicMaterial({ color: "#1c1c22", transparent: true, opacity: 0.3 })
-    );
-    underShadow.position.set(0, -1.02, 0.18);
-    underShadow.scale.set(1.06, 0.17, 0.7);
-    cloud.add(underShadow);
     scene.add(cloud);
 
     // ------------------------------------------------------------------
@@ -956,7 +947,7 @@ export function WeatherScene({ condition, isNight, numberText }: WeatherScenePro
     // --- only spawned when numberIsWet (rain/storm/rainy-night). ---
     // Shared geometry/material - only position/scale differ per droplet, so
     // there's no need for each of the ~5 droplets per digit to own one.
-    const dropletGeometry = new THREE.SphereGeometry(9, 10, 8);
+    const dropletGeometry = new THREE.SphereGeometry(6.5, 10, 8);
     dropletGeometry.scale(1, 1.6, 0.6); // squashed into a teardrop pressed flat against the surface
     const dropletMaterial = new THREE.MeshStandardMaterial({
       color: "#eaf6ff",
@@ -1222,7 +1213,7 @@ export function WeatherScene({ condition, isNight, numberText }: WeatherScenePro
     // slide down the number's face (see spawnRainDroplets in the number
     // section below) - falling rain and "wet number" droplets should read
     // as the same water, not two unrelated particle styles.
-    const rainDropGeometry = new THREE.SphereGeometry(0.045, 8, 6);
+    const rainDropGeometry = new THREE.SphereGeometry(0.033, 8, 6);
     rainDropGeometry.scale(1, 1.5, 0.55);
     if (theme.showRain) {
       for (let index = 0; index < 18; index += 1) {
