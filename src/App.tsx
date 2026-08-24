@@ -1,23 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type FormEvent } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 
 import { WeatherScene } from "./components/WeatherScene";
+import { TemperatureNumber } from "./components/TemperatureNumber";
 import { fallbackWeather } from "./data/mockWeather";
 import {
   fetchLiveWeather,
   fetchLiveWeatherByCoords,
   fetchLiveWeatherByIp,
-  fetchLocationSuggestions,
-  fetchOpenMeteoService
+  fetchLocationSuggestions
 } from "./lib/liveWeather";
 import type { WeatherSnapshot, LocationSuggestion } from "./types";
 
 gsap.registerPlugin(useGSAP);
 
 
-const BASE_WIDGET_WIDTH = 290;
-const BASE_WIDGET_HEIGHT = 240;
+const BASE_WIDGET_WIDTH = 300;
+const BASE_WIDGET_HEIGHT = 260;
+const EXPANDED_WIDGET_HEIGHT = 540;
 const zeroWeather: WeatherSnapshot = {
   ...fallbackWeather,
   city: "Location unavailable",
@@ -106,388 +110,92 @@ function getUvLabel(value: number) {
   return "Low";
 }
 
-function renderOpenMeteoData(data: unknown): JSX.Element {
-  if (data === null || data === undefined) {
-    return <p>No data available.</p>;
-  }
-
-  if (Array.isArray(data)) {
-    return (
-      <div>
-        <p>Items: {data.length}</p>
-        <ul>
-          {data.slice(0, 5).map((item, idx) => (
-            <li key={idx}>{typeof item === "object" ? JSON.stringify(item) : String(item)}</li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
-  if (typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    const firstKeys = Object.keys(obj).slice(0, 20);
-    return (
-      <div className="open-meteo-service-data">
-        {firstKeys.map((key) => {
-          const value = obj[key];
-          if (value === null || value === undefined) {
-            return null;
-          }
-
-          if (typeof value === "object") {
-            if (Array.isArray(value)) {
-              return (
-                <div key={key} className="open-meteo-service-row">
-                  <strong>{key}</strong>: array ({value.length})
-                </div>
-              );
-            }
-
-            return (
-              <div key={key} className="open-meteo-service-row">
-                <strong>{key}</strong>: {JSON.stringify(value)}
-              </div>
-            );
-          }
-
-          return (
-            <div key={key} className="open-meteo-service-row">
-              <strong>{key}</strong>: {String(value)}
-            </div>
-          );
-        })}
-        {Object.keys(obj).length > firstKeys.length ? (
-          <em>... {Object.keys(obj).length - firstKeys.length} more keys</em>
-        ) : null}
-      </div>
-    );
-  }
-
-  return <p>{String(data)}</p>;
-}
-
-function getAirQualityLabel(key: string, value: number) {
-  if (key === "us_aqi") {
-    if (value <= 50) return "Good";
-    if (value <= 100) return "Moderate";
-    if (value <= 150) return "Poor";
-    if (value <= 200) return "Unhealthy";
-    if (value <= 300) return "Very Poor";
-    return "Dangerous";
-  }
-  if (key === "pm2_5") {
-    if (value <= 12.0) return "Good";
-    if (value <= 35.4) return "Moderate";
-    if (value <= 55.4) return "Poor";
-    if (value <= 150.4) return "Very Poor";
-    return "Dangerous";
-  }
-  if (key === "pm10") {
-    if (value <= 54) return "Good";
-    if (value <= 154) return "Moderate";
-    if (value <= 254) return "Poor";
-    if (value <= 354) return "Very Poor";
-    return "Dangerous";
-  }
-  return "";
-}
-
-function renderAirQualityData(data: unknown, cityName: string): JSX.Element {
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    if (obj.current && typeof obj.current === "object") {
-      const current = obj.current as Record<string, unknown>;
-      const units = (obj.current_units as Record<string, unknown>) || {};
-      return (
-        <div className="open-meteo-service-data">
-          <div className="open-meteo-service-row" style={{ marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "12px" }}>
-            <strong>Real-time (Current) Air Quality for {cityName}</strong>
-          </div>
-          {Object.keys(current).map((key) => {
-            if (key === "time" || key === "interval" || key === "european_aqi") return null;
-            const label = key === "us_aqi" ? "AQI" :
-                          key === "pm10" ? "PM10" :
-                          key === "pm2_5" ? "PM2.5" :
-                          key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-
-            const numValue = Number(current[key]);
-            const qualityDesc = !isNaN(numValue) ? getAirQualityLabel(key, numValue) : "";
-            const displayDesc = qualityDesc ? ` (${qualityDesc})` : "";
-
-            return (
-              <div key={key} className="open-meteo-service-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', marginBottom: '8px', gap: '16px' }}>
-                <strong style={{ color: "rgba(255,255,255,0.9)", wordBreak: 'break-word', flexShrink: 1, minWidth: 0 }}>{label}</strong>
-                <span style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <strong style={{ color: "white", display: 'block' }}>{String(current[key])} {units[key] && units[key] !== "USAQI" ? String(units[key]) : ""}</strong>
-                  <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9em" }}>{displayDesc}</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-  }
-  return renderOpenMeteoData(data);
-}
-
-function renderSeasonalData(data: unknown, cityName: string): JSX.Element {
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    if (obj.daily && typeof obj.daily === "object") {
-      const daily = obj.daily as Record<string, unknown[]>;
-      const times = daily.time as string[];
-      const tempMax = daily.temperature_2m_max as number[];
-      const tempMin = daily.temperature_2m_min as number[];
-      const precip = daily.precipitation_sum as number[];
-
-      if (Array.isArray(times)) {
-        // Aggregate the 180-day forecast into monthly averages.
-        const monthlyData: Record<string, { max: number[], min: number[], precip: number[] }> = {};
-        times.forEach((time, index) => {
-          if (typeof time !== "string") return;
-          const month = time.substring(0, 7); // YYYY-MM
-          if (!monthlyData[month]) {
-            monthlyData[month] = { max: [], min: [], precip: [] };
-          }
-          if (tempMax && typeof tempMax[index] === "number") monthlyData[month].max.push(tempMax[index]);
-          if (tempMin && typeof tempMin[index] === "number") monthlyData[month].min.push(tempMin[index]);
-          if (precip && typeof precip[index] === "number") monthlyData[month].precip.push(precip[index]);
-        });
-
-        const months = Object.keys(monthlyData).slice(0, 6); // Show the next six months.
-
-        return (
-          <div className="open-meteo-service-data">
-            <div className="open-meteo-service-row" style={{ marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "12px" }}>
-              <strong>Seasonal Forecast (Monthly Averages) for {cityName}</strong>
-            </div>
-            {months.map(month => {
-              const monthData = monthlyData[month];
-              const avgMax = monthData.max.length > 0 ? Math.round(monthData.max.reduce((a, b) => a + b, 0) / monthData.max.length) : "--";
-              const avgMin = monthData.min.length > 0 ? Math.round(monthData.min.reduce((a, b) => a + b, 0) / monthData.min.length) : "--";
-              const totalPrecip = monthData.precip.length > 0 ? Math.round(monthData.precip.reduce((a, b) => a + b, 0)) : "--";
-              
-              const [yearStr, monthStr] = month.split("-");
-              const dateObj = new Date(Number(yearStr), Number(monthStr) - 1, 1);
-              const monthName = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-              return (
-                <div key={month} className="open-meteo-service-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', marginBottom: '8px', rowGap: '12px', columnGap: '24px' }}>
-                  <div style={{ flex: '1 1 120px', color: 'white', fontWeight: 'bold' }}>
-                    <span>{monthName}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', flex: '1 1 180px', minWidth: '180px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>High</span>
-                      <strong style={{ color: "white", fontSize: "1em" }}>{avgMax}°</strong>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Low</span>
-                      <strong style={{ color: "white", fontSize: "1em" }}>{avgMin}°</strong>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rain</span>
-                      <strong style={{ color: "white", fontSize: "1em" }}>{totalPrecip}mm</strong>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      }
-    }
-  }
-  return renderOpenMeteoData(data);
-}
-
-function renderElevationData(data: unknown, cityName: string): JSX.Element {
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj.elevation) && obj.elevation.length > 0) {
-      return (
-        <div className="open-meteo-service-data">
-          <div className="open-meteo-service-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', marginBottom: '8px' }}>
-            <div style={{ color: 'white', fontWeight: 'bold' }}>
-              Elevation for {cityName}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
-              <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Altitude</span>
-              <strong style={{ color: "white", fontSize: "1em" }}>{obj.elevation[0]} meters</strong>
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
-  return renderOpenMeteoData(data);
-}
-
-function renderGeocodingData(data: unknown, cityName: string): JSX.Element {
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj.results) && obj.results.length > 0) {
-      return (
-        <div className="open-meteo-service-data">
-           <div className="open-meteo-service-row" style={{ marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "12px" }}>
-            <strong>Geocoding Info near {cityName}</strong>
-          </div>
-          {obj.results.slice(0, 4).map((res: any, i) => (
-            <div key={i} className="open-meteo-service-row" style={{ padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', marginBottom: '8px' }}>
-              <div style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold' }}>
-                <span style={{ wordBreak: 'break-word' }}>{res.name} {res.country ? `(${res.country})` : ""}</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', rowGap: '8px', columnGap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Latitude</span>
-                  <strong style={{ color: "white", fontSize: "1em", wordBreak: 'break-word' }}>{res.latitude?.toFixed(4)}</strong>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Longitude</span>
-                  <strong style={{ color: "white", fontSize: "1em", wordBreak: 'break-word' }}>{res.longitude?.toFixed(4)}</strong>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gridColumn: 'span 2' }}>
-                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timezone</span>
-                  <strong style={{ color: "white", fontSize: "1em", wordBreak: 'break-word' }}>{res.timezone}</strong>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-    }
-  }
-  return renderOpenMeteoData(data);
-}
-
-function renderTimeSeriesData(data: unknown, cityName: string, title: string, timezone?: string): JSX.Element {
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    const seriesData = (obj.hourly || obj.daily || obj.models_yearly) as Record<string, unknown[]> | undefined;
-    const units = (obj.hourly_units || obj.daily_units || obj.models_yearly_units || {}) as Record<string, string>;
-
-    if (seriesData && Array.isArray(seriesData.time)) {
-      const times = seriesData.time as string[];
-      const isHourly = !!obj.hourly;
-      let startIndex = 0;
-
-      let yyyy, mm, dd, hh;
-      try {
-        const d = new Date();
-        const tz = timezone || "UTC";
-        const local = new Date(d.toLocaleString("en-US", { timeZone: tz }));
-        yyyy = local.getFullYear();
-        mm = String(local.getMonth() + 1).padStart(2, '0');
-        dd = String(local.getDate()).padStart(2, '0');
-        hh = String(local.getHours()).padStart(2, '0');
-      } catch (e) {
-        const d = new Date();
-        yyyy = d.getUTCFullYear();
-        mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-        dd = String(d.getUTCDate()).padStart(2, '0');
-        hh = String(d.getUTCHours()).padStart(2, '0');
-      }
-
-      if (isHourly) {
-        const currentHourPrefix = `${yyyy}-${mm}-${dd}T${hh}`;
-        startIndex = times.findIndex(t => String(t).startsWith(currentHourPrefix));
-        if (startIndex === -1) {
-          startIndex = times.findIndex(t => String(t) >= currentHourPrefix);
-          if (startIndex === -1) startIndex = 0;
-        }
-      } else {
-         const todayPrefix = `${yyyy}-${mm}-${dd}`;
-         const todayIdx = times.findIndex(t => String(t).startsWith(todayPrefix));
-         if (todayIdx !== -1) startIndex = todayIdx;
-      }
-
-      const nextTimes = times.slice(startIndex, startIndex + 6);
-      const keys = Object.keys(seriesData).filter(k => k !== "time");
-
-      const hasValidData = nextTimes.some((_, idx) => {
-        const dataIndex = startIndex + idx;
-        return keys.some(k => seriesData[k][dataIndex] !== null && seriesData[k][dataIndex] !== undefined);
-      });
-
-      if (!hasValidData) {
-        return (
-          <div className="open-meteo-service-data">
-            <div className="open-meteo-service-row" style={{ marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "12px" }}>
-              <strong>{title} for {cityName}</strong>
-            </div>
-            <p style={{ color: "rgba(255,255,255,0.8)", padding: "4px 0" }}>No data available for this specific location. (Marine forecasts only return data for oceans and coastal areas).</p>
-          </div>
-        );
-      }
-
-      return (
-        <div className="open-meteo-service-data">
-          <div className="open-meteo-service-row" style={{ marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "12px" }}>
-            <strong>{title} for {cityName}</strong>
-          </div>
-          {nextTimes.map((time, idx) => {
-            const dataIndex = startIndex + idx;
-            const timeStr = isHourly 
-              ? new Date(time).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
-              : String(time);
-
-            return (
-            <div key={time} className="open-meteo-service-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', marginBottom: '8px', rowGap: '12px', columnGap: '24px' }}>
-              <div style={{ flex: '0 0 80px', color: 'white', fontWeight: 'bold' }}>
-                  <span>{timeStr}</span>
-                </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', rowGap: '8px', columnGap: '12px', flex: 1, minWidth: '150px' }}>
-                  {keys.map(k => {
-                    const val = seriesData[k][dataIndex];
-                    const label = k.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-                    let displayVal = val !== null && val !== undefined ? String(val) : "--";
-                    if (typeof val === 'number' && !Number.isInteger(val)) displayVal = val.toFixed(2);
-                    
-                    return (
-                      <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75em", textTransform: 'uppercase', letterSpacing: '0.5px', wordBreak: 'break-word' }}>{label}</span>
-                        <strong style={{ color: "white", fontSize: "1em", wordBreak: 'break-word' }}>{displayVal}{units[k] ? ` ${units[k]}` : ""}</strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-  }
-  return renderOpenMeteoData(data);
-}
-
 function getCurrentPosition() {
-  return new Promise<GeolocationPosition>((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("Geolocation unavailable"));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 1000 * 60 * 10
-    });
+  // Capacitor's Geolocation plugin handles the native Android permission
+  // prompt itself and falls back to navigator.geolocation on web/Electron.
+  return Geolocation.getCurrentPosition({
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 1000 * 60 * 10
   });
+}
+
+const isNativeApp = Capacitor.isNativePlatform();
+
+// On native mobile there's no OS window to drag/resize, so the widget card
+// supports its own drag-to-move and drag-to-resize within the app screen,
+// with the chosen position/size remembered between launches.
+interface NativeCardRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const NATIVE_CARD_STORAGE_KEY = "coolweather-native-card";
+const NATIVE_CARD_MIN_WIDTH = 180;
+const NATIVE_CARD_MIN_HEIGHT = 160;
+
+function loadNativeCardRect(): NativeCardRect | null {
+  try {
+    const raw = window.localStorage.getItem(NATIVE_CARD_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed?.x === "number" &&
+      typeof parsed?.y === "number" &&
+      typeof parsed?.width === "number" &&
+      typeof parsed?.height === "number"
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Ignore corrupt/unavailable storage - fall back to the default rect.
+  }
+  return null;
+}
+
+function saveNativeCardRect(rect: NativeCardRect) {
+  try {
+    window.localStorage.setItem(NATIVE_CARD_STORAGE_KEY, JSON.stringify(rect));
+  } catch {
+    // Ignore storage failures (e.g. private mode).
+  }
+}
+
+function clampNativeCardRect(rect: NativeCardRect): NativeCardRect {
+  const maxWidth = Math.min(window.innerWidth - 16, 520);
+  const maxHeight = Math.min(window.innerHeight - 16, 720);
+  const width = Math.min(Math.max(rect.width, NATIVE_CARD_MIN_WIDTH), Math.max(NATIVE_CARD_MIN_WIDTH, maxWidth));
+  const height = Math.min(Math.max(rect.height, NATIVE_CARD_MIN_HEIGHT), Math.max(NATIVE_CARD_MIN_HEIGHT, maxHeight));
+  const x = Math.min(Math.max(rect.x, 0), Math.max(0, window.innerWidth - width));
+  const y = Math.min(Math.max(rect.y, 0), Math.max(0, window.innerHeight - height));
+  return { x, y, width, height };
+}
+
+function defaultNativeCardRect(): NativeCardRect {
+  const width = BASE_WIDGET_WIDTH;
+  const height = BASE_WIDGET_HEIGHT;
+  return {
+    x: Math.round((window.innerWidth - width) / 2),
+    y: Math.round((window.innerHeight - height) / 2),
+    width,
+    height
+  };
 }
 
 export default function App() {
   const [weather, setWeather] = useState<WeatherSnapshot>(fallbackWeather);
   const [status, setStatus] = useState("Loading location...");
   const [appError, setAppError] = useState<string | null>(null);
-const PANEL_WIDTH = 380;
-  const BASE_WIDTH = 300;
-  // TOTAL_WIDTH = BASE_WIDTH + PANEL_WIDTH; // DISABLED - no extra window resize
 
   useEffect(() => {
     console.log("App starting", { weather, status });
+    if (isNativeApp) {
+      document.body.classList.add("is-native-app");
+    }
   }, []);
 
   if (appError) {
@@ -513,6 +221,11 @@ const PANEL_WIDTH = 380;
   }
 
   const [widgetSize, setWidgetSize] = useState({ width: BASE_WIDGET_WIDTH, height: BASE_WIDGET_HEIGHT });
+  const [nativeCardRect, setNativeCardRect] = useState<NativeCardRect | null>(() =>
+    isNativeApp ? loadNativeCardRect() ?? defaultNativeCardRect() : null
+  );
+  const dragStateRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const resizeStateRef = useRef<{ pointerId: number; startX: number; startY: number; originWidth: number; originHeight: number } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -521,51 +234,114 @@ const PANEL_WIDTH = 380;
   const [manualQuery, setManualQuery] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
-  const [selectedOpenMeteoService, setSelectedOpenMeteoService] = useState<string | null>(null);
-  const [openMeteoServiceData, setOpenMeteoServiceData] = useState<unknown>(null);
-  const [openMeteoServiceError, setOpenMeteoServiceError] = useState<string | null>(null);
-  const [openMeteoServiceLoading, setOpenMeteoServiceLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandAnchorY, setExpandAnchorY] = useState<"top" | "bottom">("top");
-
-  const OPEN_METEO_SERVICES = [
-    { id: "seasonal-forecast", label: "Seasonal Forecast" },
-    { id: "climate-change", label: "Climate Change" },
-    { id: "marine-forecast", label: "Marine Forecast" },
-    { id: "air-quality", label: "Air Quality" },
-    { id: "satellite-radiation", label: "Satellite Radiation" },
-    { id: "geocoding", label: "Geocoding" },
-    { id: "elevation", label: "Elevation" },
-    { id: "flood", label: "Flood" }
-  ];
+  // Desktop-only: whether the real desktop behind the transparent widget is dark
+  // there, so the condition label / location text can flip to stay legible.
+  const [backdropIsDark, setBackdropIsDark] = useState(true);
 
   const widgetRef = useRef<HTMLElement | null>(null);
 
-  useGSAP(() => {
-    
-    const numTl = gsap.timeline({ repeat: -1, repeatDelay: 4.2 });
+  useEffect(() => {
+    if (!isNativeApp) {
+      return;
+    }
 
-    gsap.set('.poster-number-wrap', { transformPerspective: 800, transformStyle: "preserve-3d", transformOrigin: "center" });
+    const handleViewportResize = () => {
+      setNativeCardRect((prev) => (prev ? clampNativeCardRect(prev) : prev));
+    };
 
-    numTl.to('.poster-number-wrap', {
-      rotationY: -8,
-      duration: 0.95,
-      ease: "sine.inOut"
-    }).to('.poster-number-wrap', {
-      rotationY: 0,
-      duration: 1.1,
-      ease: "sine.inOut"
-    }).to('.poster-number-wrap', {
-      rotationY: 8,
-      duration: 0.95,
-      ease: "sine.inOut"
-    }).to('.poster-number-wrap', {
-      rotationY: 0,
-      duration: 1.1,
-      ease: "sine.inOut"
+    window.addEventListener("resize", handleViewportResize);
+    return () => window.removeEventListener("resize", handleViewportResize);
+  }, []);
+
+  const handleCardPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (!isNativeApp || isExpanded || !nativeCardRect) {
+      return;
+    }
+    const target = event.target as HTMLElement;
+    if (target.closest(".poster-number-button") || target.closest(".poster-resize-handle")) {
+      return;
+    }
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: nativeCardRect.x,
+      originY: nativeCardRect.y
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleCardPointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = dragStateRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    setNativeCardRect((prev) =>
+      prev ? clampNativeCardRect({ ...prev, x: drag.originX + dx, y: drag.originY + dy }) : prev
+    );
+  };
+
+  const endCardDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (!dragStateRef.current || dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    dragStateRef.current = null;
+    setNativeCardRect((prev) => {
+      if (prev) {
+        saveNativeCardRect(prev);
+      }
+      return prev;
     });
+  };
 
+  const handleResizePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    event.stopPropagation();
+    if (!isNativeApp || isExpanded || !nativeCardRect) {
+      return;
+    }
+    resizeStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originWidth: nativeCardRect.width,
+      originHeight: nativeCardRect.height
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleResizePointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    const resize = resizeStateRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) {
+      return;
+    }
+    const dx = event.clientX - resize.startX;
+    const dy = event.clientY - resize.startY;
+    setNativeCardRect((prev) =>
+      prev
+        ? clampNativeCardRect({ ...prev, width: resize.originWidth + dx, height: resize.originHeight + dy })
+        : prev
+    );
+  };
+
+  const endCardResize = (event: React.PointerEvent<HTMLElement>) => {
+    if (!resizeStateRef.current || resizeStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    resizeStateRef.current = null;
+    setNativeCardRect((prev) => {
+      if (prev) {
+        saveNativeCardRect(prev);
+      }
+      return prev;
+    });
+  };
+
+  useGSAP(() => {
     // Animate the cloud layer from right to left with soft edge fades.
     const cloudTl = gsap.timeline({ repeat: -1 });
     cloudTl.fromTo('.poster-scene [class*="cloud"], .poster-scene [class*="Cloud"]',
@@ -589,7 +365,7 @@ const PANEL_WIDTH = 380;
   }, { scope: widgetRef, dependencies: [weather.condition, weather.isNight] });
 
   useEffect(() => {
-   
+
     const element = widgetRef.current;
     if (!element) {
       return;
@@ -599,7 +375,7 @@ const PANEL_WIDTH = 380;
       const { width, height } = element.getBoundingClientRect();
       setWidgetSize({
         width: Math.max(280, Math.round(width)),
-        height: Math.max(240, Math.round(height))
+        height: Math.max(BASE_WIDGET_HEIGHT, Math.round(height))
       });
     };
 
@@ -623,7 +399,13 @@ const PANEL_WIDTH = 380;
   };
 
 // Expand the panel vertically without changing its width or position.
+// On native mobile there is no OS window to resize - the app already fills the
+// screen and the detail panel is just an overlay, so this is Electron-only.
     useEffect(() => {
+      if (isNativeApp) {
+        return;
+      }
+
       let cancelled = false;
 
       const syncWindowSize = async () => {
@@ -635,9 +417,9 @@ const PANEL_WIDTH = 380;
         } catch {
           if (!cancelled) {
             if (isExpanded) {
-              window.resizeTo(290, 580);
+              window.resizeTo(BASE_WIDGET_WIDTH, EXPANDED_WIDGET_HEIGHT);
             } else {
-              window.resizeTo(290, 240);
+              window.resizeTo(BASE_WIDGET_WIDTH, BASE_WIDGET_HEIGHT);
             }
             setExpandAnchorY("top");
           }
@@ -650,6 +432,37 @@ const PANEL_WIDTH = 380;
         cancelled = true;
       };
     }, [isExpanded]);
+
+  // Desktop-only: periodically sample the real desktop behind the widget so the
+  // label/location text can switch between light and dark styling to stay
+  // readable, regardless of what's on the user's wallpaper/windows behind it.
+  useEffect(() => {
+    if (isNativeApp || !window.coolWeatherDesktop?.sampleBackdrop) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const sample = async () => {
+      try {
+        const result = await window.coolWeatherDesktop?.sampleBackdrop?.();
+        if (!cancelled && result) {
+          setBackdropIsDark(result.isDark);
+        }
+      } catch {
+        // Keep the last known value on failure.
+      }
+    };
+
+    void sample();
+    const intervalId = window.setInterval(sample, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -712,9 +525,26 @@ const PANEL_WIDTH = 380;
       void loadWeather();
     }, 1000 * 60 * 5);
 
+    // Mobile OSes suspend JS timers while the app is backgrounded, so the 5-minute
+    // interval above won't fire while away - refresh explicitly when the app
+    // comes back to the foreground instead.
+    let removeAppStateListener: (() => void) | undefined;
+    if (isNativeApp) {
+      CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) {
+          void loadWeather();
+        }
+      }).then((handle) => {
+        removeAppStateListener = () => {
+          void handle.remove();
+        };
+      });
+    }
+
     return () => {
       active = false;
       window.clearInterval(timer);
+      removeAppStateListener?.();
     };
   }, [manualQuery]);
 
@@ -725,18 +555,36 @@ const PANEL_WIDTH = 380;
   !weather.isNight;
   const historicalData = weather.historicalData ?? [];
 
+  // TEMP TEST HOOK - remove before finishing: #test=storm-night forces the
+  // scene condition for screenshotting each weather look in isolation.
+  const [testHash, setTestHash] = useState(window.location.hash);
+  useEffect(() => {
+    const onHashChange = () => setTestHash(window.location.hash);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+  const testMatch = testHash.match(/test=([a-z-]+)-(day|night)/);
+  const displayCondition = (testMatch ? testMatch[1] : weather.condition) as WeatherSnapshot["condition"];
+  const displayIsNight = testMatch ? testMatch[2] === "night" : Boolean(weather.isNight);
+
   const layout = useMemo(() => {
     const widthRatio = widgetSize.width / BASE_WIDGET_WIDTH;
     const heightRatio = widgetSize.height / BASE_WIDGET_HEIGHT;
-    const sceneScale = Math.min(widthRatio, heightRatio, 1);
-    const numberFontSize = Math.round(Math.min(widgetSize.width * 0.28, widgetSize.height * 0.37));
-    const numberWidth = Math.round(numberFontSize * 1.42);
-    const numberHeight = Math.round(numberFontSize * 1.34);
-    const numberTop = Math.round(widgetSize.height * 0.34);
-    const labelTop = numberTop + numberHeight - Math.max(24, Math.round(widgetSize.height * 0.06));
-    const statusTop = labelTop + Math.max(20, Math.round(widgetSize.height * 0.055));
+    // Desktop caps at 1x since its window only ever varies slightly from the base
+    // widget size. Native mobile lets the user freely resize the card larger via the
+    // resize handle, so the scene needs to scale up past 1x to fill it.
+    const sceneScale = isNativeApp ? Math.min(widthRatio, heightRatio) : Math.min(widthRatio, heightRatio, 1);
+    const numberFontSize = Math.round(Math.min(widgetSize.width * 0.32, widgetSize.height * 0.42));
+    const numberWidth = Math.round(numberFontSize * 1.34);
+    const numberHeight = Math.round(numberFontSize * 1.46);
+    const numberTop = Math.round(widgetSize.height * 0.28);
+    // numberHeight is the canvas box, not the visible glyph bottom - the glyph
+    // sits well above the box's own bottom edge, so pull the label up into that
+    // slack instead of stacking below the full canvas height.
+    const labelTop = numberTop + numberHeight - Math.max(14, Math.round(widgetSize.height * 0.08));
     const labelFontSize = Math.max(14, Math.round(numberFontSize * 0.16));
-    const statusFontSize = Math.max(11, Math.round(numberFontSize * 0.1));
+    const locationTop = labelTop + Math.max(18, Math.round(labelFontSize * 1.3));
+    const locationFontSize = Math.max(10, Math.round(labelFontSize * 0.62));
 
     return {
       sceneScale,
@@ -745,20 +593,17 @@ const PANEL_WIDTH = 380;
       numberHeight,
       numberTop,
       labelTop,
-      statusTop,
       labelFontSize,
-      statusFontSize,
-      depthBack: Math.max(5, Math.round(numberFontSize * 0.05)),
-      depthSide: Math.max(3, Math.round(numberFontSize * 0.032)),
-      strokeWidth: Math.max(0.4, numberFontSize * 0.004)
+      locationTop,
+      locationFontSize
     };
   }, [widgetSize.height, widgetSize.width]);
 
-  const sceneFrameStyle = {
+  const sceneFrameStyle: CSSProperties = {
     width: `${BASE_WIDGET_WIDTH}px`,
     height: `${BASE_WIDGET_HEIGHT}px`,
     transform: `translateX(-50%) scale(${layout.sceneScale})`
-  } as CSSProperties;
+  };
 
   const numberWrapStyle = {
     top: `${layout.numberTop}px`,
@@ -766,43 +611,9 @@ const PANEL_WIDTH = 380;
     height: `${layout.numberHeight}px`
   } as CSSProperties;
 
-  const numberTextStyle = {
-    fontSize: `${layout.numberFontSize}px`,
-    WebkitTextStroke: usesDarkNumber
-      ? `${layout.strokeWidth}px rgba(5, 5, 5, 0.26)`
-      : `${layout.strokeWidth}px rgba(255, 255, 255, 0.7)`
-  } as CSSProperties;
-
-  const numberBackStyle = {
-    transform: `translate(${layout.depthBack}px, ${layout.depthBack}px) scaleY(1.24)`,
-    color: "rgba(0, 0, 0, 0.12)"
-  } as CSSProperties;
-
-  const numberSideStyle = {
-    transform: `translate(${layout.depthSide}px, ${layout.depthSide}px) scaleY(1.24)`,
-    color: "rgba(0, 0, 0, 0.35)",
-    textShadow: `0 4px 12px rgba(0,0,0,0.2)`
-  } as CSSProperties;
-
-  const numberFrontStyle = {
-  ...numberTextStyle,
-  color: usesDarkNumber ? "#111827" : "#ffffff",
-  textShadow: usesDarkNumber
-    ? `
-      0 1px 0 rgba(255,255,255,0.25),
-      0 6px 18px rgba(0,0,0,0.18),
-      0 12px 30px rgba(0,0,0,0.12)
-    `
-    : `
-      0 1px 0 rgba(255,255,255,0.6),
-      0 4px 10px rgba(0,0,0,0.12),
-      0 10px 25px rgba(0,0,0,0.18)
-    `,
-  filter: `
-    drop-shadow(0 6px 18px rgba(0,0,0,0.15))
-    drop-shadow(0 2px 6px rgba(255,255,255,0.08))
-  `,
-} as CSSProperties;
+  // Desktop-only adaptive contrast (native mobile has its own opaque
+  // background, so it always stays on the light-text styling below).
+  const useDarkText = !isNativeApp && !backdropIsDark;
 
   const labelStyle = {
     top: `${layout.labelTop}px`,
@@ -810,21 +621,23 @@ const PANEL_WIDTH = 380;
     transform: "translateX(-50%)",
     textAlign: "center",
     fontSize: `${layout.labelFontSize}px`,
-    color: "rgba(245, 248, 255, 0.94)",
-    textShadow: "0 1px 3px rgba(0, 0, 0, 0.4)"
+    color: useDarkText ? "rgba(18, 20, 28, 0.92)" : "rgba(245, 248, 255, 0.94)",
+    textShadow: useDarkText ? "0 1px 3px rgba(255, 255, 255, 0.5)" : "0 1px 3px rgba(0, 0, 0, 0.4)"
   } as CSSProperties;
 
-  const statusStyle = {
-    top: `${layout.statusTop}px`,
+  const locationStyle = {
+    top: `${layout.locationTop}px`,
     left: "50%",
     transform: "translateX(-50%)",
     textAlign: "center",
-    fontSize: `${layout.statusFontSize}px`,
-    color: "rgba(238, 242, 248, 0.78)",
-    textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)"
+    fontSize: `${layout.locationFontSize}px`,
+    color: useDarkText ? "rgba(18, 20, 28, 0.68)" : "rgba(238, 242, 248, 0.68)",
+    textShadow: useDarkText ? "0 1px 3px rgba(255, 255, 255, 0.5)" : "0 1px 3px rgba(0, 0, 0, 0.4)"
   } as CSSProperties;
 
-  const widgetAnchorStyle = isExpanded && expandAnchorY === "bottom"
+  // Desktop-only: while the OS window is expanding and the desktop widget should
+  // stay pinned to the bottom of the taller window, override its anchoring.
+  const widgetAnchorStyle = !isNativeApp && isExpanded && expandAnchorY === "bottom"
     ? ({
         position: "absolute",
         left: 0,
@@ -832,6 +645,20 @@ const PANEL_WIDTH = 380;
         bottom: 0
       } as CSSProperties)
     : undefined;
+
+  // Native mobile: the card is user-positioned/resized (drag + resize handle)
+  // rather than centered by CSS, so it needs explicit absolute placement.
+  const nativeWidgetStyle: CSSProperties | undefined =
+    isNativeApp && nativeCardRect
+      ? {
+          position: "absolute",
+          left: `${nativeCardRect.x}px`,
+          top: `${nativeCardRect.y}px`,
+          width: `${nativeCardRect.width}px`,
+          height: `${nativeCardRect.height}px`,
+          touchAction: "none"
+        }
+      : undefined;
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -861,38 +688,6 @@ const PANEL_WIDTH = 380;
       setPanelMessage("Could not find that location.");
     } finally {
       setIsSearching(false);
-    }
-  };
-
-  const handleServiceButtonClick = (serviceId: string) => {
-    if (selectedOpenMeteoService === serviceId) {
-      setSelectedOpenMeteoService(null);
-      setOpenMeteoServiceData(null);
-      setOpenMeteoServiceError(null);
-    } else {
-      void loadOpenMeteoService(serviceId);
-    }
-  };
-
-
-  const loadOpenMeteoService = async (serviceId: string) => {
-    if (!weather.latitude || !weather.longitude) {
-      setOpenMeteoServiceError("Location latitude/longitude not available yet.");
-      return;
-    }
-
-    setSelectedOpenMeteoService(serviceId);
-    setOpenMeteoServiceLoading(true);
-    setOpenMeteoServiceError(null);
-    setOpenMeteoServiceData(null);
-
-    try {
-      const result = await fetchOpenMeteoService(serviceId, weather.latitude, weather.longitude, weather.timezone);
-      setOpenMeteoServiceData(result);
-    } catch (error) {
-      setOpenMeteoServiceError(error instanceof Error ? error.message : "Unknown error");
-    } finally {
-      setOpenMeteoServiceLoading(false);
     }
   };
 
@@ -1008,20 +803,42 @@ const debounce = (fn: Function, delay: number) => {
         `}
       </style>
     <main
-        className={`poster-shell condition-${weather.condition}`}
-        style={{
-          position: "relative",
-          width: "290px",  // Keep the widget width fixed for the overlay layout.
-          height: isExpanded ? "580px" : "240px",
-          overflow: "hidden"
-        }}
+        className={`poster-shell condition-${weather.condition}${isNativeApp ? " is-native-app" : ""}`}
+        style={
+          isNativeApp
+            ? { position: "relative", width: "100vw", height: "100dvh", overflow: "hidden" }
+            : {
+                position: "relative",
+                width: `${BASE_WIDGET_WIDTH}px`,
+                height: isExpanded ? `${EXPANDED_WIDGET_HEIGHT}px` : `${BASE_WIDGET_HEIGHT}px`,
+                overflow: "hidden"
+              }
+        }
       >
-      <section className="poster-widget" ref={widgetRef} style={widgetAnchorStyle}>
+      <section
+        className="poster-widget"
+        ref={widgetRef}
+        style={{ ...widgetAnchorStyle, ...nativeWidgetStyle, visibility: isExpanded ? "hidden" : "visible" }}
+        onPointerDown={handleCardPointerDown}
+        onPointerMove={handleCardPointerMove}
+        onPointerUp={endCardDrag}
+        onPointerCancel={endCardDrag}
+      >
         <div className="poster-frame poster-scene-frame" style={sceneFrameStyle}>
           <div className="poster-scene">
-            <WeatherScene condition={weather.condition} temperature={weather.temperatureC} isNight={Boolean(weather.isNight)} />
+            <WeatherScene condition={displayCondition} temperature={weather.temperatureC} isNight={displayIsNight} />
           </div>
         </div>
+
+        {isNativeApp && !isExpanded ? (
+          <div
+            className="poster-resize-handle"
+            onPointerDown={handleResizePointerDown}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={endCardResize}
+            onPointerCancel={endCardResize}
+          />
+        ) : null}
 
         <div className="poster-hero">
           <button
@@ -1031,24 +848,22 @@ const debounce = (fn: Function, delay: number) => {
             aria-label={showTempPlaceholder ? "Temperature unavailable" : `${Math.round(weather.temperatureC)} degrees`}
             onClick={expandPanel}
           >
-            <span className="poster-number-back" style={{ ...numberTextStyle, ...numberBackStyle }}>
-              {temperatureDisplay}
-            </span>
-            <span className="poster-number-side" style={{ ...numberTextStyle, ...numberSideStyle }}>
-              {temperatureDisplay}
-            </span>
-            <span className="poster-number-front" style={numberFrontStyle}>
-              {temperatureDisplay}
-            </span>
+            <TemperatureNumber
+              value={temperatureDisplay}
+              width={layout.numberWidth}
+              height={layout.numberHeight}
+            />
           </button>
 
           <div className="poster-label" style={labelStyle}>
             {displayConditionName(weather.condition, Boolean(weather.isNight))}
           </div>
 
-          <div className="poster-status" style={statusStyle}>
-            {status}
-          </div>
+          {!showTempPlaceholder && (weather.specificLocation || weather.city) && (
+            <div className="poster-location" style={locationStyle}>
+              {weather.specificLocation || weather.city}
+            </div>
+          )}
         </div>
       </section>
 
@@ -1173,7 +988,7 @@ const debounce = (fn: Function, delay: number) => {
                         </span>
 
                         <span className="forecast-state">
-                          {displayConditionName(item.condition)}
+                          {displayConditionName(item.condition, item.isNight)}
                         </span>
                         <span className="forecast-meta">
                           UV {item.uvIndex.toFixed(1)}
@@ -1243,52 +1058,6 @@ const debounce = (fn: Function, delay: number) => {
                   </div>
                 </section>
               )}
-
-              <section className="detail-open-meteo-tools">
-<div className="detail-section-head">
-                  <span>Fetch more live data for this location</span>
-                </div>
-                <div className="open-meteo-service-list">
-                  {OPEN_METEO_SERVICES.map((service) => (
-                    <React.Fragment key={service.id}>
-                      <button
-                        type="button"
-                        className={`open-meteo-service-button${service.id === selectedOpenMeteoService ? " active" : ""}`}
-                        onClick={() => handleServiceButtonClick(service.id)}
-                      >
-                        {service.label}
-                      </button>
-                      {selectedOpenMeteoService === service.id && (
-                        <div className="open-meteo-service-output" style={{ gridColumn: '1 / -1' }}>
-                          {openMeteoServiceLoading ? (
-                            <p>Loading {service.label}…</p>
-                          ) : openMeteoServiceError ? (
-                            <p className="error">{openMeteoServiceError}</p>
-                          ) : openMeteoServiceData ? (
-                            service.id === "air-quality"
-                              ? renderAirQualityData(openMeteoServiceData, weather.city)
-                              : service.id === "seasonal-forecast"
-                              ? renderSeasonalData(openMeteoServiceData, weather.city)
-                              : service.id === "marine-forecast"
-                              ? renderTimeSeriesData(openMeteoServiceData, weather.city, "Marine Forecast", weather.timezone)
-                              : service.id === "satellite-radiation"
-                              ? renderTimeSeriesData(openMeteoServiceData, weather.city, "Satellite Radiation", weather.timezone)
-                              : service.id === "flood"
-                              ? renderTimeSeriesData(openMeteoServiceData, weather.city, "Flood Risk", weather.timezone)
-                              : service.id === "climate-change"
-                              ? renderTimeSeriesData(openMeteoServiceData, weather.city, "Climate Change", weather.timezone)
-                              : service.id === "elevation"
-                              ? renderElevationData(openMeteoServiceData, weather.city)
-                              : service.id === "geocoding"
-                              ? renderGeocodingData(openMeteoServiceData, weather.city)
-                              : renderOpenMeteoData(openMeteoServiceData)
-                          ) : null}
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </section>
 
               <section className="detail-search-dock">
                 <form className="search-glass" onSubmit={handleSearch}>

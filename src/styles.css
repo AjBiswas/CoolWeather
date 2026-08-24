@@ -3,13 +3,6 @@
 :root {
   color-scheme: light;
   font-family: "Bebas Neue", "Bahnschrift Condensed", "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
-  --front-top: #ffffff;
-  --front-mid: #f0f2f5;
-  --front-low: #d6dbe2;
-  --side: rgba(178, 62, 70, 0.9);
-  --back: rgba(178, 62, 70, 0.18);
-  --bevel-light: rgba(255, 255, 255, 0.92);
-  --bevel-shadow: rgba(0, 0, 0, 0.14);
 }
 
 * {
@@ -38,11 +31,62 @@ body,
   overflow: hidden;
 }
 
+/* Native Android build: the app fills the real screen instead of the small
+   transparent desktop widget, so it needs its own opaque background and
+   room for the status bar / notch instead of showing the OS desktop through. */
+body.is-native-app,
+.poster-shell.is-native-app {
+  background: #070c14;
+}
+
+.poster-shell.is-native-app {
+  width: 100%;
+  /* Keep the same compact widget card as desktop, just centered on the
+     full phone screen instead of stretched to fill it. */
+  align-items: center;
+  justify-content: center;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.poster-shell.is-native-app .poster-widget {
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.poster-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 32px;
+  height: 32px;
+  z-index: 5;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.poster-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0 0 3px 0;
+}
+
+.poster-shell.is-native-app .detail-panel {
+  max-width: 480px;
+}
+
 .poster-widget {
   -webkit-app-region: drag;
   position: relative;
-  width: 290px;
-  height: 240px;
+  width: 300px;
+  height: 260px;
   overflow: hidden;
   border-radius: 24px;
   box-shadow: none;
@@ -84,70 +128,21 @@ body,
   -webkit-app-region: no-drag;
 }
 
-.poster-number-back,
-.poster-number-side,
-.poster-number-front {
+.temperature-number-canvas {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  font-family: "Bebas Neue", "Bahnschrift Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 0.8;
-  transform-origin: center top;
-  text-rendering: geometricPrecision;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.poster-number-back {
-  color: var(--back);
-}
-
-.poster-number-side {
-  color: var(--side);
-}
-
-.poster-number-front {
-  transform: scaleY(1.24);
-  color: transparent;
+  display: block;
 }
 
 .poster-number-wrap.is-placeholder {
   transform: translateX(-50%);
 }
 
-.poster-number-wrap.is-placeholder .poster-number-back,
-.poster-number-wrap.is-placeholder .poster-number-side,
-.poster-number-wrap.is-placeholder .poster-number-front {
-  align-items: center;
-  font-family: "Bahnschrift", "Segoe UI", sans-serif;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-
-.poster-number-wrap.is-placeholder .poster-number-back,
-.poster-number-wrap.is-placeholder .poster-number-side {
-  transform: translate(0, 0) scaleY(1);
-  filter: none;
-}
-
-.poster-number-wrap.is-placeholder .poster-number-front {
-  transform: scaleY(1);
-}
-
-.poster-label,
-.poster-status {
+.poster-label {
   position: absolute;
   left: 50%;
   white-space: nowrap;
   pointer-events: none;
-}
-
-.poster-label {
   transform: translateX(-42%);
   font-family: "Bahnschrift", "Segoe UI", sans-serif;
   font-weight: 700;
@@ -155,10 +150,16 @@ body,
   line-height: 1;
 }
 
-.poster-status {
+.poster-location {
+  position: absolute;
+  left: 50%;
+  white-space: nowrap;
+  pointer-events: none;
   transform: translateX(-50%);
   font-family: "Bahnschrift", "Segoe UI", sans-serif;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 .detail-overlay {
@@ -199,7 +200,11 @@ body,
   padding: 8px;
 
   color: #eef4ff;
-  background: linear-gradient(155deg, rgba(0, 0, 0, 0.78), rgba(14, 14, 14, 0.68));
+  /* backdrop-filter doesn't composite correctly over a transparent: true
+     Electron window - Chromium falls back to solid black instead of sampling
+     the real desktop behind it. Plain rgba alpha blending isn't affected by
+     that limitation, so it's the only reliable way to get a see-through panel. */
+  background: linear-gradient(155deg, rgba(6, 8, 16, 0.74), rgba(4, 5, 10, 0.64));
 
   box-shadow:
     -10px 0 40px rgba(0, 0, 0, 0.5),

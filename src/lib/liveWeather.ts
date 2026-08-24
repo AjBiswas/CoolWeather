@@ -764,6 +764,7 @@ function buildHourlySlices(
       label: formatHourLabel(hourly.time[index], offset === 0),
       temperatureC: hourly.temperature_2m[index],
       condition: toCondition(hourly.weather_code[index]),
+      isNight: hourly.is_day[index] === 0,
       windKph: hourly.wind_speed_10m[index],
       uvIndex: hourly.uv_index[index]
     }));
@@ -904,7 +905,8 @@ async function buildWeatherSnapshot(match: LocationMatch): Promise<WeatherSnapsh
     "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day,uv_index"
   );
   forecastUrl.searchParams.set("hourly", "temperature_2m,weather_code,wind_speed_10m,uv_index,is_day");
-  forecastUrl.searchParams.set("forecast_days", "1");
+  // 2 days so the hourly forecast slices don't run short late in the day.
+  forecastUrl.searchParams.set("forecast_days", "2");
   forecastUrl.searchParams.set("timezone", match.timezone ?? "auto");
 
   const forecastData = await desktopFetchJson<ForecastResponse>(forecastUrl.toString());

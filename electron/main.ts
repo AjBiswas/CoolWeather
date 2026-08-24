@@ -1,13 +1,14 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen, desktopCapturer } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appIconPath = path.join(process.cwd(), "assets", "coolweather.ico");
+const APP_NAME = "Cool Weather";
 
-const COLLAPSED_SIZE = { width: 290, height: 240 };
-const EXPANDED_SIZE = { width: 290, height: 580 };
+const COLLAPSED_SIZE = { width: 300, height: 260 };
+const EXPANDED_SIZE = { width: 300, height: 540 };
 
 console.log("Main process script started.");
 
@@ -56,7 +57,7 @@ function createWindow() {
     minHeight: COLLAPSED_SIZE.height,
     maxWidth: COLLAPSED_SIZE.width,
     maxHeight: Math.round(height * 0.8),
-    title: "CoolWeather",
+    title: APP_NAME,
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -131,6 +132,81 @@ function createWindow() {
     return nextBounds;
   };
 
+  ipcMain.removeHandler("widget:sample-backdrop");
+  ipcMain.handle("widget:sample-backdrop", async () => {
+    try {
+      const bounds = win.getBounds();
+      const display = screen.getDisplayMatching(bounds);
+
+      const sources = await desktopCapturer.getSources({
+        types: ["screen"],
+        thumbnailSize: { width: 480, height: 480 }
+      });
+      if (sources.length === 0) {
+        return null;
+      }
+      const source =
+        sources.find((candidate) => candidate.display_id === String(display.id)) ?? sources[0];
+      const thumb = source.thumbnail;
+      const thumbSize = thumb.getSize();
+      if (thumbSize.width === 0 || thumbSize.height === 0) {
+        return null;
+      }
+
+      // Map the widget's on-screen rect to a fraction of the display, then apply
+      // that same fraction to the thumbnail's own pixel size - avoids needing to
+      // know the exact DPI scale factor between logical window bounds and the
+      // captured thumbnail's resolution.
+      const relX = (bounds.x - display.bounds.x) / display.bounds.width;
+      const relY = (bounds.y - display.bounds.y) / display.bounds.height;
+      const relW = bounds.width / display.bounds.width;
+      const relH = bounds.height / display.bounds.height;
+
+      // Only the bottom slice, where the condition label / location text sits -
+      // a more relevant sample than averaging the whole cloud/number artwork.
+      const sliceRelY = relY + relH * 0.62;
+      const sliceRelH = relH * 0.38;
+
+      const cropRect = {
+        x: Math.max(0, Math.round(relX * thumbSize.width)),
+        y: Math.max(0, Math.round(sliceRelY * thumbSize.height)),
+        width: Math.max(1, Math.round(relW * thumbSize.width)),
+        height: Math.max(1, Math.round(sliceRelH * thumbSize.height))
+      };
+      cropRect.width = Math.min(cropRect.width, thumbSize.width - cropRect.x);
+      cropRect.height = Math.min(cropRect.height, thumbSize.height - cropRect.y);
+      if (cropRect.width <= 0 || cropRect.height <= 0) {
+        return null;
+      }
+
+      const cropped = thumb.crop(cropRect);
+      const bitmap = cropped.toBitmap(); // BGRA
+      if (bitmap.length === 0) {
+        return null;
+      }
+
+      let total = 0;
+      let count = 0;
+      // Sample every 4th pixel - plenty for an average over a small region.
+      for (let i = 0; i < bitmap.length; i += 16) {
+        const b = bitmap[i];
+        const g = bitmap[i + 1];
+        const r = bitmap[i + 2];
+        total += 0.299 * r + 0.587 * g + 0.114 * b;
+        count += 1;
+      }
+      if (count === 0) {
+        return null;
+      }
+
+      const avgLuminance = total / count;
+      return { isDark: avgLuminance < 140 };
+    } catch (error) {
+      console.warn("Backdrop sampling failed:", error);
+      return null;
+    }
+  });
+
   ipcMain.removeHandler("widget:set-size");
   ipcMain.handle("widget:set-size", (_event, mode: "small" | "large" | "toggle") => {
     if (moveClampTimer) {
@@ -186,6 +262,8 @@ function createWindow() {
 
 app.whenReady().then(() => {
   console.log("App is ready.");
+  app.setName(APP_NAME);
+  app.setAppUserModelId("com.coolweather.desktop");
   createWindow();
 });
 

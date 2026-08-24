@@ -13,7 +13,9 @@
     "dev:desktop": "node_modules\\.bin\\wait-on.cmd dist/electron/main.js tcp:5173 && node_modules\\.bin\\electron.cmd .",
     "build": "node_modules\\.bin\\tsc.cmd --noEmit -p tsconfig.json && node_modules\\.bin\\tsc.cmd -p tsconfig.node.json && node_modules\\.bin\\vite.cmd build",
     "preview": "node_modules\\.bin\\vite.cmd preview",
-    "dist": "npm.cmd run build && node_modules\\.bin\\electron-builder.cmd"
+    "dist": "npm.cmd run build && node_modules\\.bin\\electron-builder.cmd",
+    "android:sync": "npm.cmd run build && node_modules\\.bin\\cap.cmd sync android",
+    "android:open": "node_modules\\.bin\\cap.cmd open android"
   },
   "build": {
     "appId": "com.coolweather.desktop",
@@ -33,6 +35,10 @@
     }
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/geolocation": "^8.2.2",
     "@gsap/react": "^2.1.2",
     "gsap": "^3.14.2",
     "react": "^18.3.1",
@@ -40,6 +46,8 @@
     "three": "^0.177.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^22.15.2",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",

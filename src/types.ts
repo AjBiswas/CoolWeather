@@ -48,6 +48,7 @@ export interface HourlyDetailPoint {
   label: string;
   temperatureC: number;
   condition: WeatherCondition;
+  isNight: boolean;
   windKph: number;
   uvIndex: number;
 }
@@ -68,32 +69,4 @@ export interface LocationSuggestion {
   admin1?: string;
   latitude: number;
   longitude: number;
-}
-
-export interface WeatherSnapshot {
-  city: string;
-  region: string;
-  specificLocation?: string;
-  latitude?: number;
-  longitude?: number;
-  temperatureC: number;
-  feelsLikeC: number;
-  humidity: number;
-  windKph: number;
-  uvIndex: number;
-  aqi?: number;
-  aqiStatus?: string;
-  condition: WeatherCondition;
-  summary: string;
-  updatedAt: string;
-  source?: string;
-  live?: boolean;
-  timezone?: string;
-  sunrise?: string;
-  sunset?: string;
-  moonrise?: string;
-  moonset?: string;
-  forecast: ForecastPoint[];
-  hourlyDetails: HourlyDetailPoint[];
-  historicalData?: HistoricalDataPoint[];
 }

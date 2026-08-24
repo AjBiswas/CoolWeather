@@ -10,7 +10,15 @@ interface WeatherSceneProps {
   isNight?: boolean;
 }
 
-type ThemeKey = WeatherCondition | "partly-cloudy-night" | "cloudy-night" | "rainy-night";
+type ThemeKey =
+  | WeatherCondition
+  | "clear-night"
+  | "partly-cloudy-night"
+  | "cloudy-night"
+  | "rainy-night"
+  | "haze-night"
+  | "snow-night"
+  | "night";
 
 interface SceneTheme {
   cloudColor: string;
@@ -31,6 +39,8 @@ interface SceneTheme {
   fillIntensity: number;
   bounceIntensity: number;
   cloudCount: number;
+  lightningStrikeChance?: number;
+  lightningCooldown?: [number, number];
 }
 
 interface CloudMotion {
@@ -101,7 +111,7 @@ const sceneThemes: Record<
   clear: {
      cloudColor: "#eaeef5",
     rainColor: "#8abfff",
-    orbColor: "#f2b844",
+    orbColor: "#f29a38",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
     orbScale: 1.15,         
@@ -122,7 +132,7 @@ const sceneThemes: Record<
   "mostly-sunny": {
     cloudColor: "#eaeef5",
     rainColor: "#8abfff",
-    orbColor: "#f2b844",
+    orbColor: "#f29a38",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
     orbScale: 1.15,         
@@ -143,7 +153,7 @@ const sceneThemes: Record<
   "partly-cloudy": {
     cloudColor: "#eaeef5",
     rainColor: "#8abfff",
-    orbColor: "#f2b844",
+    orbColor: "#f29a38",
     orbOpacity: 1.0, 
     cloudOpacity: 0.88,    
     orbScale: 1.15,         
@@ -161,26 +171,47 @@ const sceneThemes: Record<
     bounceIntensity: 0.18,
     emissiveIntensity: 2.2
   },
-    "partly-cloudy-night": {
+  "partly-cloudy-night": {
     cloudColor: "#1f2b45",
     rainColor: "#8abfff",
-    orbColor: "#f5f7ff" ,
-    orbOpacity: 1.0, 
-    cloudOpacity: 0.88,    
-    orbScale: 1.15,         
-    showGlow: true,        
+    orbColor: "#e9e4d2" ,
+    orbOpacity: 1.0,
+    cloudOpacity: 0.88,
+    orbScale: 1.15,
+    showGlow: true,
     showRain: false,
     showLightning: false,
-    showStars: true,   
+    showStars: true,
     cloudCount: 4,
     backgroundColor: "#0e1632",
-    ambientIntensity: 0.42,   
+    ambientIntensity: 0.42,
     keyColor: "#dfe8ff",
-    keyIntensity: 1.0,        
+    keyIntensity: 1.0,
     fillColor: "#4a5c88",
     fillIntensity: 0.28,
     bounceIntensity: 0.18,
-    emissiveIntensity: 2.2
+    emissiveIntensity: 1.1
+  },
+  "clear-night": {
+    cloudColor: "#2f3e5e",
+    rainColor: "#8abfff",
+    orbColor: "#e9e4d2",
+    orbOpacity: 0.8,
+    cloudOpacity: 0.75,
+    orbScale: 1.15,
+    showGlow: true,
+    showRain: false,
+    showLightning: false,
+    showStars: true,
+    cloudCount: 0,
+    backgroundColor: "#081a3a",
+    ambientIntensity: 0.4,
+    keyColor: "#d9e7ff",
+    keyIntensity: 1.1,
+    fillColor: "#3a5680",
+    fillIntensity: 0.28,
+    bounceIntensity: 0.18,
+    emissiveIntensity: 1.1
   },
   haze: {
     cloudColor: "#b8bec3",     
@@ -201,7 +232,28 @@ const sceneThemes: Record<
     fillColor: "#c6cbd4",
     fillIntensity: 0.3,
     bounceIntensity: 0.15,
-    emissiveIntensity: 1.0     
+    emissiveIntensity: 1.0
+  },
+  "haze-night": {
+    cloudColor: "#4a4f57",
+    rainColor: "#93b6c9",
+    orbColor: "#d8cdb0",
+    orbOpacity: 0.4,           // Dim, obscured moon through haze.
+    orbScale: 0.38,
+    showGlow: false,
+    showRain: false,
+    showLightning: false,
+    showStars: false,          // Haze blocks stars at night just like it dims the sun by day.
+    cloudOpacity: 0.8,
+    cloudCount: 6,
+    backgroundColor: "#2b2d33",
+    ambientIntensity: 0.32,
+    keyColor: "#cfc6ae",
+    keyIntensity: 0.5,
+    fillColor: "#55565c",
+    fillIntensity: 0.22,
+    bounceIntensity: 0.12,
+    emissiveIntensity: 0.5
   },
   cloudy: {
     cloudColor: "#c7d2e4",     // Slightly brighter grey-blue clouds.
@@ -239,7 +291,9 @@ const sceneThemes: Record<
     showGlow: false,
 
     showRain: true,
-    showLightning: false,
+    showLightning: true,          // Occasional distant thunder, far less often than a full storm.
+    lightningStrikeChance: 0.12,
+    lightningCooldown: [3, 6.5],
     showStars: false,
 
     // Use heavy cloud coverage.
@@ -269,7 +323,9 @@ const sceneThemes: Record<
     showGlow: false,
 
     showRain: true,        // Keep precipitation enabled.
-    showLightning: false,
+    showLightning: true,   // Occasional distant thunder, far less often than a full storm.
+    lightningStrikeChance: 0.12,
+    lightningCooldown: [3, 6.5],
     showStars: false,
 
     cloudOpacity: 0.95,
@@ -340,6 +396,31 @@ const sceneThemes: Record<
     fillIntensity: 0.4,
     bounceIntensity: 0.25
   },
+  "snow-night": {
+    cloudColor: "#3a4560",
+    rainColor: "#ffffff",      // Snow particles stay white; keeps falling at night.
+    showRain: true,
+
+    orbColor: "#e9e4d2",
+    orbOpacity: 0.55,
+    orbScale: 0.3,
+    showGlow: true,
+    showLightning: false,
+    showStars: true,
+
+    cloudOpacity: 0.95,
+    cloudCount: 7,
+
+    backgroundColor: "#0e1830",
+
+    ambientIntensity: 0.42,
+    keyColor: "#d9e7ff",
+    keyIntensity: 0.85,
+    fillColor: "#3a4f70",
+    fillIntensity: 0.26,
+    bounceIntensity: 0.16,
+    emissiveIntensity: 0.5
+  },
   sunset: {
     cloudColor: "#f7e7dc",
     orbColor: "#ff9f54",
@@ -357,8 +438,13 @@ const sceneThemes: Record<
     bounceIntensity: 0.3
   },
  night: {
-    cloudColor: "#2f3e5e",     // Slightly darker cloud tone.
-    orbColor: "#f0f4ff",
+    // Final catch-all night theme - only reached for conditions with no dedicated
+    // night variant (e.g. "sunset" paired with isNight, which shouldn't normally
+    // happen since dusk hours aren't flagged as night, but is handled safely here).
+    cloudColor: "#2f3e5e",
+    orbColor: "#e9e4d2",
+    showRain: false,
+    showLightning: false,
 
     orbOpacity: 0.8,           // Make the moon more prominent.
     orbScale: 1.15,            // Increase the moon size slightly.
@@ -374,7 +460,7 @@ const sceneThemes: Record<
     bounceIntensity: 0.18,
 
     cloudOpacity: 0.75,
-    cloudCount: 5,
+    cloudCount: 2,
     showStars: true
   },
   "cloudy-night": {
@@ -458,7 +544,11 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     let themeKey: ThemeKey;
 
     if (isNight) {
-      if (condition === "partly-cloudy") {
+      if (condition === "clear") {
+        themeKey = "clear-night";
+      } else if (condition === "mostly-sunny") {
+        themeKey = "clear-night";
+      } else if (condition === "partly-cloudy") {
         themeKey = "partly-cloudy-night";
       } else if (condition === "cloudy") {
         themeKey = "cloudy-night";
@@ -466,6 +556,10 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         themeKey = "rainy-night";
       } else if (condition === "storm") {
         themeKey = "storm";
+      } else if (condition === "haze") {
+        themeKey = "haze-night";
+      } else if (condition === "snow") {
+        themeKey = "snow-night";
       } else {
         themeKey = "night";
       }
@@ -474,10 +568,15 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     }
 
     const baseTheme = sceneThemes[themeKey];
+    // Overcast themes (cloudy/rain/storm) keep the sun/moon orb subtly hidden
+    // behind the clouds regardless of day or night - the sun/moon shouldn't be
+    // visible through heavy cloud cover any more during the day than at night.
     const isHiddenOrbScene =
       themeKey === "cloudy" ||
       themeKey === "cloudy-night" ||
-      (isNight && (themeKey === "rainy-night" || themeKey === "storm"));
+      themeKey === "rain" ||
+      themeKey === "rainy-night" ||
+      themeKey === "storm";
     const theme = {
       ...baseTheme,
       showGlow: isHiddenOrbScene ? false : true,
@@ -486,11 +585,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         : isNight
         ? Math.max(baseTheme.orbScale, 1.05)
         : Math.max(baseTheme.orbScale, 0.95),
-      orbOpacity: isHiddenOrbScene
-        ? 0
-        : isNight
-        ? 1
-        : 1,
+      orbOpacity: isHiddenOrbScene ? 0 : 1,
       emissiveIntensity: isHiddenOrbScene
         ? 0
         : Math.max((baseTheme as any).emissiveIntensity ?? 1.4, isNight ? 1.9 : 1.6)
@@ -517,16 +612,18 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 100);
     camera.position.set(0, 0, 10.8);
 
-    // Base ambient light.
-    scene.add(new THREE.AmbientLight("#ffffff", theme.ambientIntensity));
+    // Base ambient light. Dimmed relative to the key light (below) for more
+    // dramatic puff-to-puff shading instead of a flat, evenly-lit look.
+    scene.add(new THREE.AmbientLight("#ffffff", theme.ambientIntensity * 0.78));
 
-    // Primary directional light for the sun or moon.
-    const key = new THREE.DirectionalLight(theme.keyColor, theme.keyIntensity);
+    // Primary directional light for the sun or moon - boosted for stronger
+    // contrast between lit and shadowed cloud puffs.
+    const key = new THREE.DirectionalLight(theme.keyColor, theme.keyIntensity * 1.35);
     key.position.set(-3, 4, 5);
     scene.add(key);
 
     // Secondary fill light.
-    const fill = new THREE.DirectionalLight(theme.fillColor, theme.fillIntensity);
+    const fill = new THREE.DirectionalLight(theme.fillColor, theme.fillIntensity * 0.85);
     fill.position.set(3, 2, 4);
     scene.add(fill);
 
@@ -539,7 +636,12 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     const cloudMotions: CloudMotion[] = [];
     const isDenseCloudScene = theme.cloudCount >= 8;
     const isRainScene = theme.showRain;
-    const isClearBirdScene = !isNight && (condition === "clear" || condition === "mostly-sunny");
+    // Storm clouds should feel turbulent and fast-moving, not the same slow
+    // drift as plain overcast/rain - boost speed and amplitude just for storm.
+    const stormSpeedBoost = themeKey === "storm" ? 2.4 : 1;
+    const stormAmpBoost = themeKey === "storm" ? 1.7 : 1;
+    const isClearBirdScene =
+      condition === "clear" || (!isNight && condition === "mostly-sunny");
     const cloudVerticalOffset =
       themeKey === "cloudy" ||
       themeKey === "cloudy-night" ||
@@ -622,16 +724,16 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       baseX: initialX,
       baseY: jitterY,
       baseZ: finalZ,
-      driftSpeed: isDenseCloudScene ? 0.004 + Math.random() * 0.008 : 0.035 + Math.random() * 0.04 + (isFront ? 0.015 : 0),
-      driftSpan: isDenseCloudScene ? 0.45 + Math.random() * 0.5 : 5.8 + Math.random() * 1.8,
-      bobAmp: isDenseCloudScene ? 0.008 + Math.random() * 0.012 : 0.018 + Math.random() * 0.03,
-      bobSpeed: isDenseCloudScene ? 0.12 + Math.random() * 0.12 : 0.28 + Math.random() * 0.32,
+      driftSpeed: (isDenseCloudScene ? 0.004 + Math.random() * 0.008 : 0.035 + Math.random() * 0.04 + (isFront ? 0.015 : 0)) * stormSpeedBoost,
+      driftSpan: (isDenseCloudScene ? 0.45 + Math.random() * 0.5 : 5.8 + Math.random() * 1.8) * stormAmpBoost,
+      bobAmp: (isDenseCloudScene ? 0.008 + Math.random() * 0.012 : 0.018 + Math.random() * 0.03) * stormAmpBoost,
+      bobSpeed: (isDenseCloudScene ? 0.12 + Math.random() * 0.12 : 0.28 + Math.random() * 0.32) * stormSpeedBoost,
       bobPhase: Math.random() * Math.PI * 2,
-      swayAmp: isDenseCloudScene ? 0.015 + Math.random() * 0.025 : 0.08 + Math.random() * 0.12 + (isFront ? 0.04 : 0),
-      swaySpeed: isDenseCloudScene ? 0.08 + Math.random() * 0.08 : 0.16 + Math.random() * 0.2,
+      swayAmp: (isDenseCloudScene ? 0.015 + Math.random() * 0.025 : 0.08 + Math.random() * 0.12 + (isFront ? 0.04 : 0)) * stormAmpBoost,
+      swaySpeed: (isDenseCloudScene ? 0.08 + Math.random() * 0.08 : 0.16 + Math.random() * 0.2) * stormSpeedBoost,
       swayPhase: Math.random() * Math.PI * 2,
-      rollAmp: isDenseCloudScene ? 0.004 + Math.random() * 0.01 : 0.02 + Math.random() * 0.03,
-      rollSpeed: isDenseCloudScene ? 0.05 + Math.random() * 0.06 : 0.14 + Math.random() * 0.12,
+      rollAmp: (isDenseCloudScene ? 0.004 + Math.random() * 0.01 : 0.02 + Math.random() * 0.03) * stormAmpBoost,
+      rollSpeed: (isDenseCloudScene ? 0.05 + Math.random() * 0.06 : 0.14 + Math.random() * 0.12) * stormSpeedBoost,
       scalePulseAmp: isDenseCloudScene ? 0.04 + Math.random() * 0.03 : 0.018 + Math.random() * 0.018,
       scalePulseSpeed: isDenseCloudScene ? 0.09 + Math.random() * 0.08 : 0.18 + Math.random() * 0.14,
       scalePulsePhase: Math.random() * Math.PI * 2,
@@ -642,23 +744,21 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
   }
 
 
+    // Ground shadow beneath the number/scene - always present regardless of
+    // cloud count, since it grounds the whole composition, not just the clouds.
     const underShadow = new THREE.Mesh(
       new THREE.SphereGeometry(1.6, 32, 32),
-      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.22 * theme.cloudOpacity })
+      new THREE.MeshBasicMaterial({ color: "#1c1c22", transparent: true, opacity: 0.3 })
     );
-    underShadow.position.set(0.08, -1.75, -0.9);
-    underShadow.scale.set(1.55, 0.29, 0.9);
+    underShadow.position.set(0, -1.02, 0.18);
+    underShadow.scale.set(1.06, 0.17, 0.7);
     cloud.add(underShadow);
     scene.add(cloud);
 
     const orb = !isHiddenOrbScene ? new THREE.Mesh(
     new THREE.CircleGeometry(theme.orbScale, 48),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshBasicMaterial({
       color: new THREE.Color(theme.orbColor),
-      emissive: new THREE.Color(theme.orbColor),
-      emissiveIntensity: theme.emissiveIntensity || 1.4,   // Control orb glow strength.
-      roughness: 0.4,
-      metalness: 0,
       transparent: true,
       opacity: theme.orbOpacity
     })
@@ -680,7 +780,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
       });
       const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
       glowMesh.position.set(0, 1.38, -1.05);
-      glowMesh.scale.set(1, 1.08, 1);
+      glowMesh.scale.set(1.28, 1.08, 1);
       glowMesh.renderOrder = -1;
       scene.add(glowMesh);
     }
@@ -688,7 +788,7 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     const starGroup = new THREE.Group();
     const starMotions: StarMotion[] = [];
     if (theme.showStars) {
-      for (let index = 0; index < 7; index += 1) {
+      for (let index = 0; index < 14; index += 1) {
         const starMaterial = new THREE.MeshBasicMaterial({
           color: theme.orbColor === "#f7f9ff" ? "#ffe" : "#ffd76a",
           transparent: true,
@@ -832,20 +932,25 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
     lightning.renderOrder = 6;
     scene.add(lightning);
 
+    // A real point light at the strike position, not a flat scene-wide tint -
+    // physical falloff (distance/decay) naturally gives more light near the
+    // strike and less further away.
+    const lightningFlashLight = new THREE.PointLight("#dce8ff", 0, 6, 2);
+    lightningFlashLight.position.set(0.5, 1.0, 1.3);
+    scene.add(lightningFlashLight);
+
     const clock = new THREE.Clock();
     let frameId = 0;
     let lightningTimer = 0;
     let isFlashing = false;
 
-    const flashColor = new THREE.Color("#1a2a4f");
-
     const animate = () => {
       const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
 
-      cloud.position.x = isDenseCloudScene ? Math.sin(elapsed * 0.04) * 0.012 : Math.sin(elapsed * 0.08) * 0.05;
-      cloud.position.y = isDenseCloudScene ? Math.sin(elapsed * 0.08) * 0.01 : Math.sin(elapsed * 0.22) * 0.025;
-      cloud.rotation.z = isDenseCloudScene ? Math.sin(elapsed * 0.05) * 0.004 : Math.sin(elapsed * 0.11) * 0.015;
+      cloud.position.x = (isDenseCloudScene ? Math.sin(elapsed * 0.04 * stormSpeedBoost) * 0.012 : Math.sin(elapsed * 0.08) * 0.05) * stormAmpBoost;
+      cloud.position.y = (isDenseCloudScene ? Math.sin(elapsed * 0.08 * stormSpeedBoost) * 0.01 : Math.sin(elapsed * 0.22) * 0.025) * stormAmpBoost;
+      cloud.rotation.z = (isDenseCloudScene ? Math.sin(elapsed * 0.05 * stormSpeedBoost) * 0.004 : Math.sin(elapsed * 0.11) * 0.015) * stormAmpBoost;
 
       if (orb) {
         orb.position.y = 1.08 + Math.sin(elapsed * 1.4) * 0.025;
@@ -917,12 +1022,26 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         lightningTimer -= delta;
 
         if (lightningTimer <= 0) {
-          if (Math.random() > 0.9) {
+          const strikeChance = theme.lightningStrikeChance ?? 0.55;
+          const [cooldownMin, cooldownMax] = theme.lightningCooldown ?? [0.35, 1.0];
+
+          if (Math.random() < strikeChance) {
             isFlashing = true;
             lightningTimer = 0.16;
+
+            // A new strike each time, not the same spot - move the whole bolt
+            // group (and its light) to a random point across the cloud base.
+            // Narrower than the full cloud spread since the bolts themselves
+            // sit ~0.5 units right of the group's own origin - this keeps the
+            // strike within the dense middle cluster of puffs, not the sparse
+            // outer edges (or empty space past them).
+            const strikeX = -1.2 + Math.random() * 1.6;
+            const strikeY = 0.15 + Math.random() * 0.35;
+            lightning.position.set(strikeX, strikeY, 0);
+            lightningFlashLight.position.set(strikeX + 0.5, strikeY + 1.0, 1.3);
           } else {
             isFlashing = false;
-            lightningTimer = 0.65 + Math.random() * 1.35;
+            lightningTimer = cooldownMin + Math.random() * (cooldownMax - cooldownMin);
           }
         }
 
@@ -930,11 +1049,11 @@ export function WeatherScene({ condition, isNight }: WeatherSceneProps) {
         if (isFlashing) {
           lightningMat.opacity = Math.min(1, lightningMat.opacity + 0.4);
           lightningGlowMat.opacity = Math.min(0.55, lightningGlowMat.opacity + 0.22);
-          scene.background = flashColor;
+          lightningFlashLight.intensity = Math.min(4, lightningFlashLight.intensity + 1.6);
         } else {
           lightningMat.opacity *= 0.85;
           lightningGlowMat.opacity *= 0.78;
-          scene.background = null;
+          lightningFlashLight.intensity *= 0.8;
         }
       }
 
