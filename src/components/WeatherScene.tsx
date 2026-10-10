@@ -818,8 +818,12 @@ export function WeatherScene({ condition, isNight, numberText }: WeatherScenePro
 
     // Casts the shadow every digit falls onto numberShadowCatcher below -
     // shadow camera frustum is just big enough to cover the number's area.
+    // Deliberately steep/overhead, not front-on - a light near the camera
+    // axis lights the whole front face almost evenly ("flat"). Coming mostly
+    // from above instead lets the face's own curvature/angle create a real
+    // bright-top-to-dark-bottom gradient, matching the reference photo.
     const numberKeyLight = new THREE.DirectionalLight("#e8ecf5", 2.4);
-    numberKeyLight.position.set(0.6, 1.7, 3.2);
+    numberKeyLight.position.set(0.3, 3.4, 1.6);
     numberKeyLight.castShadow = true;
     numberKeyLight.shadow.mapSize.set(512, 512);
     numberKeyLight.shadow.camera.left = -2.2;
@@ -839,7 +843,7 @@ export function WeatherScene({ condition, isNight, numberText }: WeatherScenePro
     // Small ambient lift so the number's shadow side doesn't fall to pure
     // black - scoped to numberScene, so it can't wash out the moody dark
     // clouds in storm/night themes the way a scene-wide ambient would.
-    numberScene.add(new THREE.AmbientLight("#ffffff", 0.26));
+    numberScene.add(new THREE.AmbientLight("#ffffff", 0.2));
 
     // The same red rim-glow accent the reference look (and the old 2D
     // version) used along the top edges of each digit.

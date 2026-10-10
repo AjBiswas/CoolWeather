@@ -33,7 +33,10 @@ const FONT_SIZE = 1000;
 // BASE_URL respects vite.config.ts's `base: "./"` (needed so this still
 // resolves correctly when the packaged app loads index.html via file://,
 // where an absolute "/fonts/..." path would 404 against the filesystem root).
-const FONT_URL = `${import.meta.env.BASE_URL}fonts/BebasNeue-Regular.ttf`;
+// Anton, not Bebas Neue (used elsewhere in the app's 2D text) - Bebas Neue's
+// strokes read as too thin/condensed for the chunky reference look; Anton is
+// a much bolder, blockier display face at the same "one weight" simplicity.
+const FONT_URL = `${import.meta.env.BASE_URL}fonts/Anton-Regular.ttf`;
 
 let fontPromise = null;
 
@@ -102,10 +105,10 @@ async function getCharacterGlyph(char, extrudeOptions) {
 }
 
 const DEFAULT_EXTRUDE_OPTIONS = {
-  depth: 260,
-  bevelThickness: 14,
-  bevelSize: 10,
-  bevelSegments: 3,
+  depth: 300,
+  bevelThickness: 34, // taller along the extrusion (the vertical "step")
+  bevelSize: 10, // narrower across the face (a tight edge, not a wide flat facet)
+  bevelSegments: 1, // one flat chamfer facet, not a rounded curve - a sharp hard edge
   curveSegments: 24
 };
 

@@ -16,23 +16,31 @@
     "dist": "npm.cmd run build && node_modules\\.bin\\electron-builder.cmd",
     "android:sync": "npm.cmd run build && node_modules\\.bin\\cap.cmd sync android",
     "android:open": "node_modules\\.bin\\cap.cmd open android",
-    "lab:number": "node_modules\\.bin\\vite.cmd labs/3d-number --port 5174"
+    "lab:number": "node_modules\\.bin\\vite.cmd labs/3d-number --port 5174 --open"
   },
   "build": {
     "appId": "com.coolweather.desktop",
     "productName": "CoolWeather",
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "release"
     },
     "files": [
-      "dist",
+      "dist/electron/**",
+      "dist/renderer/**",
       "assets",
       "package.json"
     ],
     "win": {
-      "target": "dir",
+      "target": "nsis",
       "icon": "build/icon.ico",
       "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "CoolWeather-Setup-${version}.${ext}"
     }
   },
   "dependencies": {
